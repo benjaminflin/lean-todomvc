@@ -148,8 +148,8 @@ theorem spec_startEditing {m : Model} {l : Locals} {w : World} (h : Pre m w) (id
 
 def Model.route (m : Model) (h : String) : Model := { m with hash := h }
 
-theorem spec_route {m : Model} {l : Locals} {w : World} (h : Pre m w) :
-    R (callValue (.fn "route" []) []) l w =
+theorem spec_route {m : Model} {l : Locals} {w : World} (h : Pre m w) (args : List Value) :
+    R (callValue (.fn "route" []) args) l w =
       some (.ok ((.undef, l), renderW (m.route w.hash) (w.setGlobals (globalsOf (m.route w.hash))))) := by
   have hf := h.render.funcs
   have hg := h.render.globals

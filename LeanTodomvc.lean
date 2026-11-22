@@ -18,3 +18,5 @@ import LeanTodomvc.Proof.Handlers
 import LeanTodomvc.Proof.JsonRT
 import LeanTodomvc.Proof.Observe
 import LeanTodomvc.Proof.Step
+import LeanTodomvc.Proof.Classify
+import LeanTodomvc.Proof.Dispatch
