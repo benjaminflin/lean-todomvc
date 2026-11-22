@@ -8,3 +8,7 @@ import LeanTodomvc.App
 import LeanTodomvc.Debug
 import LeanTodomvc.Mu
 import LeanTodomvc.Spec
+import LeanTodomvc.Proof.Exec
+import LeanTodomvc.Proof.Model
+import LeanTodomvc.Proof.Funcs
+import LeanTodomvc.Proof.Render

@@ -15,6 +15,26 @@ implementation. It is deliberately small:
 
 namespace JS
 
+/-- Host objects and functions provided by the browser. Identifiers naming
+them are resolved when the JS is parsed (see `JS.Notation`), so the app may
+not bind these names itself. -/
+inductive Host where
+  | document | window | location | localStorage | json | object | string
+  deriving Repr, Inhabited, DecidableEq
+
+/-- The JS name of a host object, and the Lean name of its constructor. -/
+def Host.table : List (String × Host × Lean.Name) :=
+  [("document", .document, `JS.Host.document), ("window", .window, `JS.Host.window),
+   ("location", .location, `JS.Host.location), ("localStorage", .localStorage, `JS.Host.localStorage),
+   ("JSON", .json, `JS.Host.json), ("Object", .object, `JS.Host.object),
+   ("String", .string, `JS.Host.string)]
+
+def Host.name (h : Host) : String :=
+  ((Host.table.find? fun e => e.2.1 == h).map (·.1)).getD ""
+
+def Host.ctorName? (n : String) : Option Lean.Name :=
+  (Host.table.find? (·.1 == n)).map (·.2.2)
+
 /-- Runtime values. -/
 inductive Value where
   | undef
@@ -28,9 +48,8 @@ inductive Value where
   | node (n : Nat)
   /-- A (possibly partially applied, via `bind`) named function. -/
   | fn (name : String) (bound : List Value)
-  /-- Host objects / functions: `document`, `window`, `location`, `localStorage`,
-  `JSON`, `Object`, `String`. -/
-  | host (name : String)
+  /-- A host object or function. -/
+  | host (h : Host)
   deriving Repr, Inhabited
 
 mutual
@@ -45,7 +64,7 @@ def Value.beq : Value → Value → Bool
   | .obj as, .obj bs => Value.beqFields as bs
   | .node a, .node b => a == b
   | .fn a as, .fn b bs => a == b && Value.beqList as bs
-  | .host a, .host b => a == b
+  | .host a, .host b => decide (a = b)
   | _, _ => false
 def Value.beqList : List Value → List Value → Bool
   | [], [] => true

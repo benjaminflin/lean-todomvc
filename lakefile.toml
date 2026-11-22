@@ -9,6 +9,7 @@ relaxedAutoImplicit = false
 weak.linter.mathlibStandardSet = true
 weak.linter.style.header = false
 weak.linter.style.longLine = false
+weak.linter.unusedSimpArgs = false
 # we deliberately trust the compiler for evaluating concrete runs
 weak.linter.style.native = false
 maxSynthPendingDepth = 3

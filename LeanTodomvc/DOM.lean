@@ -37,7 +37,16 @@ structure Node where
 
 def Node.attr (n : Node) (k : String) : Option String := (n.attrs.find? (·.1 == k)).map (·.2)
 
-def Node.classes (n : Node) : List String := (n.className.splitOn " ").filter (· ≠ "")
+/-- Split on spaces, dropping empty pieces. (Structural, so it can be evaluated
+in proofs, unlike `String.splitOn`.) -/
+def splitSpaces : List Char → List Char → List String
+  | [], [] => []
+  | [], cur => [String.ofList cur.reverse]
+  | ' ' :: cs, [] => splitSpaces cs []
+  | ' ' :: cs, cur => String.ofList cur.reverse :: splitSpaces cs []
+  | c :: cs, cur => splitSpaces cs (c :: cur)
+
+def Node.classes (n : Node) : List String := splitSpaces n.className.toList []
 
 def Node.hasClass (n : Node) (c : String) : Bool := n.classes.contains c
 

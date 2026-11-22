@@ -36,9 +36,6 @@ def assocSet {α} (l : List (String × α)) (k : String) (v : α) : List (String
 
 def assocGet {α} (l : List (String × α)) (k : String) : Option α := (l.find? (·.1 == k)).map (·.2)
 
-def hostNames : List String :=
-  ["document", "window", "location", "localStorage", "JSON", "Object", "String"]
-
 def truthy : Value → Bool
   | .undef | .null => false
   | .bool b => b
@@ -57,7 +54,7 @@ def toStr : Value → String
   | .obj _ => "[object Object]"
   | .node _ => "[object HTMLElement]"
   | .fn _ _ => "function"
-  | .host h => "[object " ++ h ++ "]"
+  | .host h => "[object " ++ h.name ++ "]"
 def toStrList : List Value → List String
   | [] => []
   | v :: vs => toStr v :: toStrList vs
@@ -81,7 +78,6 @@ def lookupVar (x : String) : M Value := do
   let w ← getThe World
   if let some v := assocGet w.globals x then return v
   if (assocGet w.funcs x).isSome then return .fn x []
-  if hostNames.contains x then return .host x
   throw ("ReferenceError: " ++ x ++ " is not defined")
 
 def declVar (x : String) (v : Value) : M Unit := do
@@ -113,10 +109,10 @@ def getMember (v : Value) (f : String) : M Value := do
     | "hidden" => return .bool nd.hidden
     | "className" => return .str nd.className
     | "id" => return .str nd.id
-    | "tagName" => return .str nd.tag.toUpper
+    | "tagName" => return .str nd.tag
     | "textContent" => return .str (w.textContent n)
     | f => return ((nd.attr f).map Value.str).getD .undef
-  | .host "location", "hash" => return .str w.hash
+  | .host .location, "hash" => return .str w.hash
   | _, _ => return .undef
 
 def setMember (o : Value) (f : String) (v : Value) : M Unit := do
@@ -166,34 +162,34 @@ def builtinMethod (recv : Value) (m : String) (args : List Value) : M (Option Va
   let w ← getThe World
   match recv, m with
   | .fn f bound, "bind" => return some (.fn f (bound ++ args.drop 1))
-  | .host "document", "getElementById" =>
+  | .host .document, "getElementById" =>
     return some (((w.documentNodes.find? fun n => (w.node n).id == strArg args 0).map .node).getD .null)
-  | .host "document", "querySelector" =>
+  | .host .document, "querySelector" =>
     return some (((w.querySelector (strArg args 0)).map .node).getD .null)
-  | .host "document", "createElement" =>
-    let (w, n) := w.alloc { tag := (strArg args 0).toLower }
+  | .host .document, "createElement" =>
+    let (w, n) := w.alloc { tag := strArg args 0 }
     set w; return some (.node n)
-  | .host "document", "createTextNode" =>
+  | .host .document, "createTextNode" =>
     let (w, n) := w.alloc { tag := "#text", text := strArg args 0 }
     set w; return some (.node n)
-  | .host "localStorage", "getItem" =>
+  | .host .localStorage, "getItem" =>
     return some (((assocGet w.storage (strArg args 0)).map .str).getD .null)
-  | .host "localStorage", "setItem" =>
+  | .host .localStorage, "setItem" =>
     set { w with storage := assocSet w.storage (strArg args 0) (strArg args 1) }
     return some .undef
-  | .host "localStorage", "removeItem" =>
+  | .host .localStorage, "removeItem" =>
     set { w with storage := w.storage.filter (·.1 != strArg args 0) }
     return some .undef
-  | .host "JSON", "stringify" => return some (.str (Json.stringify (args.getD 0 .undef)))
-  | .host "JSON", "parse" =>
+  | .host .json, "stringify" => return some (.str (Json.stringify (args.getD 0 .undef)))
+  | .host .json, "parse" =>
     match Json.parse (strArg args 0) with
     | some v => return some v
     | none => throw "SyntaxError: JSON.parse"
-  | .host "Object", "assign" =>
+  | .host .object, "assign" =>
     match args with
     | .obj t :: srcs => some <$> mergeObj t srcs
     | _ => throwT "Object.assign on non-object"
-  | .host "window", "addEventListener" =>
+  | .host .window, "addEventListener" =>
     set { w with windowListeners := w.windowListeners ++ [(strArg args 0, args.getD 1 .undef)] }
     return some .undef
   | .node n, "addEventListener" =>
@@ -268,7 +264,7 @@ partial_fixpoint
 
 /-- Call a function value. Missing arguments are `undefined`, extra ones ignored. -/
 def callValue : Value → List Value → M Value
-  | .host "String", args => return .str (toStr (args.getD 0 (.str "")))
+  | .host .string, args => return .str (toStr (args.getD 0 (.str "")))
   | .fn name bound, args => do
     let some fd := assocGet (← getThe World).funcs name
       | throw ("ReferenceError: " ++ name ++ " is not defined")

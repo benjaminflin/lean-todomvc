@@ -58,6 +58,13 @@ syntax "[jsE|" jsexpr "]" : term
 syntax "[jsS|" jsstmt "]" : term
 syntax "[js|" jsstmt* "]" : term
 
+/-- Reject binding a name which is resolved to a host object at parse time. -/
+def checkBindable (x : Ident) : MacroM String := do
+  let n := x.getId.toString
+  if (JS.Host.ctorName? n).isSome then
+    Macro.throwErrorAt x s!"`{n}` is a host object and cannot be bound"
+  return n
+
 def nameStrs : Name → List String
   | .str p s => nameStrs p ++ [s]
   | .num p n => nameStrs p ++ [toString n]
@@ -79,7 +86,9 @@ def identExpr (x : Ident) : MacroM Term := do
       | "false" => `(JS.Expr.lit (.bool false))
       | "null" => `(JS.Expr.lit .null)
       | "undefined" => `(JS.Expr.lit .undef)
-      | p => `(JS.Expr.var $(quote p))
+      | p => match JS.Host.ctorName? p with
+        | some c => `(JS.Expr.lit (.host $(mkIdent c)))
+        | none => `(JS.Expr.var $(quote p))
     ps.foldlM (fun (acc : Term) f => `(JS.Expr.member $acc $(quote f))) base
 
 macro_rules
@@ -130,21 +139,30 @@ def assignTarget (lhs : TSyntax `jsexpr) (rhs : Term) : MacroM Term := do
   | _ => Macro.throwError "unsupported assignment target"
 
 macro_rules
-  | `([jsS| let $x:ident = $e ; ]) => `([JS.Stmt.decl $(quote x.getId.toString) [jsE| $e ]])
-  | `([jsS| const $x:ident = $e ; ]) => `([JS.Stmt.decl $(quote x.getId.toString) [jsE| $e ]])
+  | `([jsS| let $x:ident = $e ; ]) => do `([JS.Stmt.decl $(quote (← checkBindable x)) [jsE| $e ]])
+  | `([jsS| const $x:ident = $e ; ]) => do `([JS.Stmt.decl $(quote (← checkBindable x)) [jsE| $e ]])
   | `([jsS| $l:jsexpr = $e ; ]) => do assignTarget l (← `([jsE| $e ]))
   | `([jsS| $e:jsexpr ; ]) => `([JS.Stmt.expr [jsE| $e ]])
   | `([jsS| { $ss* } ]) => `([js| $ss* ])
   | `([jsS| if ( $c ) $t ]) => `([JS.Stmt.ite [jsE| $c ] [jsS| $t ] []])
   | `([jsS| if ( $c ) $t else $e ]) => `([JS.Stmt.ite [jsE| $c ] [jsS| $t ] [jsS| $e ]])
-  | `([jsS| for ( const $x:ident of $e ) $b ]) =>
-    `([JS.Stmt.forOf $(quote x.getId.toString) [jsE| $e ] [jsS| $b ]])
+  | `([jsS| for ( const $x:ident of $e ) $b ]) => do
+    `([JS.Stmt.forOf $(quote (← checkBindable x)) [jsE| $e ] [jsS| $b ]])
   | `([jsS| return $e ; ]) => `([JS.Stmt.ret [jsE| $e ]])
   | `([jsS| function $f:ident ( $ps,* ) { $ss* } ]) => do
-    let ps := ps.getElems.map fun p => quote (k := `term) p.getId.toString
-    `([JS.Stmt.funDecl $(quote f.getId.toString) [$ps,*] [js| $ss* ]])
+    let ps ← ps.getElems.mapM fun p => return quote (k := `term) (← checkBindable p)
+    `([JS.Stmt.funDecl $(quote (← checkBindable f)) [$ps,*] [js| $ss* ]])
   | `([js| $ss* ]) => do
     let ts ← ss.mapM fun s => `([jsS| $s ])
     `(List.flatten [$ts,*])
+
+/-- `js_function f(x, y) { … }` defines `f : JS.FunDef`. -/
+syntax (docComment)? "js_function " ident "(" ident,* ")" "{" jsstmt* "}" : command
+
+macro_rules
+  | `($[$doc?:docComment]? js_function $f:ident ( $ps,* ) { $ss* }) => do
+    let _ ← checkBindable f
+    let ps ← ps.getElems.mapM fun p => return quote (k := `term) (← checkBindable p)
+    `($[$doc?:docComment]? def $f : JS.FunDef := ⟨[$ps,*], [js| $ss* ]⟩)
 
 end JS.Notation
