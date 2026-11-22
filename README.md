@@ -1,16 +1,28 @@
 # lean-todomvc
 
-A [TodoMVC](https://github.com/tastejs/todomvc) app whose behaviour is proved in
+A [TodoMVC](https://github.com/tastejs/todomvc) app whose behaviour is 'proved in
 Lean 4 against a model of JavaScript and the DOM.
 
 The app is ordinary vanilla JavaScript plus the standard TodoMVC markup. Both
-are written inside Lean as data, where they define a transition system:
+are written inside Lean as data, where they define a transition system.
 
-- **States** are the whole browser state: the DOM (including each element's
-  event listeners), the JS global variables and functions, `localStorage`, the
-  URL hash, and a log of uncaught errors.
-- **Actions** are what a user can do: click, double-click, type into a field,
-  press a key, blur a field, edit the URL, or reload the page.
+## Transition system
+
+- The **State** is the relevant fragment of the browser state: 
+  - the DOM (including each element's
+  event listeners)
+  - the JS global variables and functions
+  - `localStorage`, 
+  - the URL hash
+  - a log of uncaught errors.
+- **Actions** are user events: 
+  - click
+  - double-click
+  - type into a field
+  - press a key (within a focused element)
+  - blur a field
+  - edit the URL
+  - reload the page.
 - **The transition function** `δ : State → Action → State` runs the event
   listeners with an interpreter for a fragment of JavaScript. The initial state
   is the result of loading the markup and running the script.
@@ -22,7 +34,7 @@ the [TodoMVC app spec](https://github.com/tastejs/todomvc/blob/master/app-spec.m
 
 The same JavaScript can be printed as a real web page and run in a browser.
 
-## What is proved
+## Proven properties
 
 `TodoMVC.invariant_holds : Sat specInvariant`. This says that every reachable
 state satisfies the following properties:
@@ -54,11 +66,9 @@ The other spec formulas in `Spec.lean` are defined but not yet proved:
 
 ### How the proof works
 
-The invariant is about what the user sees, and it is not inductive on its own.
-For example, a state can look right while the JS `filter` variable disagrees
-with the URL, and then the next render goes wrong. So the proof uses a stronger
-invariant, `Rep m s`. It says that the whole browser state `s` is exactly what
-the app's `render()` produces from an abstract `Model` `m`, except for the text
+`specInvariant` itself is not inductive, so we strengthen it, creating a stronger invariant on a 
+abstracted `Model` `m`. The relation `Rep m s` says that the whole browser state `s` is exactly what
+the app's `render()` produces from `m`, except for the text
 the user has typed into input fields. The proof shows three things:
 
 1. Loading the page gives a state satisfying `Rep` (`Proof/Init.lean`). This
