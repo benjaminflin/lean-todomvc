@@ -62,7 +62,7 @@ def fire (s : State) (n : Nat) (type : String) (key : String := "") : State :=
 
 def setHash (s : State) (h : String) : State :=
   if h == s.world.hash then s else
-  let s := { s with world := { s.world with hash := h } }
+  let s := { s with world := s.world.setHash h }
   let ls := (s.world.windowListeners.filter (·.1 == "hashchange")).map (·.2)
   ls.foldl (fun s l => s.run (fireListeners [l] (eventObj "hashchange" 0))) s
 

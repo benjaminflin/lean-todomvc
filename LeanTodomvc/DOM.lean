@@ -74,6 +74,15 @@ structure World where
 namespace World
 open DOM
 
+/-! Setters for the non-DOM parts. (Named functions rather than structure
+updates, so that proofs can treat them as opaque.) -/
+
+def setGlobals (w : World) (g : List (String × JS.Value)) : World := { w with globals := g }
+def setStorage (w : World) (st : List (String × String)) : World := { w with storage := st }
+def setFuncs (w : World) (fs : List (String × JS.FunDef)) : World := { w with funcs := fs }
+def setHash (w : World) (h : String) : World := { w with hash := h }
+def setWindowListeners (w : World) (ls : List (String × JS.Value)) : World := { w with windowListeners := ls }
+
 def node? (w : World) (n : Nat) : Option Node := w.dom[n]?
 
 def node (w : World) (n : Nat) : Node := w.dom[n]?.getD default

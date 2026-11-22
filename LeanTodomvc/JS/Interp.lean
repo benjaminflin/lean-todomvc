@@ -83,7 +83,7 @@ def lookupVar (x : String) : M Value := do
 def declVar (x : String) (v : Value) : M Unit := do
   match (← get) with
   | some ls => set (some (assocSet ls x v) : Locals)
-  | none => modifyThe World fun w => { w with globals := assocSet w.globals x v }
+  | none => modifyThe World fun w => w.setGlobals (assocSet w.globals x v)
 
 def assignVar (x : String) (v : Value) : M Unit := do
   if let some ls := (← get) then
@@ -91,7 +91,7 @@ def assignVar (x : String) (v : Value) : M Unit := do
       set (some (assocSet ls x v) : Locals); return
   let w ← getThe World
   if (assocGet w.globals x).isSome then
-    set { w with globals := assocSet w.globals x v }
+    set (w.setGlobals (assocSet w.globals x v))
   else throw ("ReferenceError: " ++ x ++ " is not defined")
 
 def getMember (v : Value) (f : String) : M Value := do
@@ -175,10 +175,10 @@ def builtinMethod (recv : Value) (m : String) (args : List Value) : M (Option Va
   | .host .localStorage, "getItem" =>
     return some (((assocGet w.storage (strArg args 0)).map .str).getD .null)
   | .host .localStorage, "setItem" =>
-    set { w with storage := assocSet w.storage (strArg args 0) (strArg args 1) }
+    set (w.setStorage (assocSet w.storage (strArg args 0) (strArg args 1)))
     return some .undef
   | .host .localStorage, "removeItem" =>
-    set { w with storage := w.storage.filter (·.1 != strArg args 0) }
+    set (w.setStorage (w.storage.filter (·.1 != strArg args 0)))
     return some .undef
   | .host .json, "stringify" => return some (.str (Json.stringify (args.getD 0 .undef)))
   | .host .json, "parse" =>
@@ -190,7 +190,7 @@ def builtinMethod (recv : Value) (m : String) (args : List Value) : M (Option Va
     | .obj t :: srcs => some <$> mergeObj t srcs
     | _ => throwT "Object.assign on non-object"
   | .host .window, "addEventListener" =>
-    set { w with windowListeners := w.windowListeners ++ [(strArg args 0, args.getD 1 .undef)] }
+    set (w.setWindowListeners (w.windowListeners ++ [(strArg args 0, args.getD 1 .undef)]))
     return some .undef
   | .node n, "addEventListener" =>
     set (w.modify n fun nd => { nd with listeners := nd.listeners ++ [(strArg args 0, args.getD 1 .undef)] })
@@ -323,7 +323,7 @@ def execS : Stmt → M Outcome
     | v => throwT (toStr v ++ " is not iterable")
   | .ret e => do return .ret (← evalE e)
   | .funDecl name ps body => do
-    modifyThe World fun w => { w with funcs := assocSet w.funcs name ⟨ps, body⟩ }
+    modifyThe World fun w => w.setFuncs (assocSet w.funcs name ⟨ps, body⟩)
     return .normal
 partial_fixpoint
 
@@ -356,7 +356,7 @@ def M.run' {α} (m : M α) (w : World) : Option (Except String (α × World)) :=
 def runScript (prog : List Stmt) : M Unit := do
   for s in prog do
     if let .funDecl name ps body := s then
-      modifyThe World fun w => { w with funcs := assocSet w.funcs name ⟨ps, body⟩ }
+      modifyThe World fun w => w.setFuncs (assocSet w.funcs name ⟨ps, body⟩)
   let _ ← execB (prog.filter fun | .funDecl .. => false | _ => true)
 
 /-- Call each listener in turn with the event object. -/

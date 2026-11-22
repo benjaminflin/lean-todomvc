@@ -1,5 +1,6 @@
 import LeanTodomvc.JS.Interp
 import LeanTodomvc.Proof.World
+import LeanTodomvc.Proof.SimpAttr
 
 /-!
 # Symbolic execution lemmas
@@ -160,7 +161,7 @@ theorem R_assignVar (x : String) (ls : List (String × Value)) (v : Value) (w : 
     R (assignVar x v) (some ls) w =
       if (assocGet ls x).isSome then some (.ok (((), some (assocSet ls x v)), w))
       else if (assocGet w.globals x).isSome then
-        some (.ok (((), some ls), { w with globals := assocSet w.globals x v }))
+        some (.ok (((), some ls), w.setGlobals (assocSet w.globals x v)))
       else some (.error ("ReferenceError: " ++ x ++ " is not defined")) := by
   unfold assignVar
   simp only [R_bind, R_get, Res.andThen_ok]
@@ -285,7 +286,7 @@ theorem R_callMethod_str (s : String) (m : String) (args : List Value) (l : Loca
 
 @[simp] theorem R_builtin_setItem (k : String) (v : Value) (args : List Value) (l : Locals) (w : World) :
     R (builtinMethod (.host .localStorage) "setItem" (.str k :: v :: args)) l w =
-      some (.ok ((some .undef, l), { w with storage := assocSet w.storage k (toStr v) })) := rfl
+      some (.ok ((some .undef, l), w.setStorage (assocSet w.storage k (toStr v)))) := rfl
 
 @[simp] theorem R_builtin_stringify (v : Value) (args : List Value) (l : Locals) (w : World) :
     R (builtinMethod (.host .json) "stringify" (v :: args)) l w =
@@ -309,7 +310,7 @@ theorem R_builtin_parse (s : String) (args : List Value) (l : Locals) (w : World
 @[simp] theorem R_builtin_window_addEventListener (t : String) (f : Value) (args : List Value)
     (l : Locals) (w : World) :
     R (builtinMethod (.host .window) "addEventListener" (.str t :: f :: args)) l w =
-      some (.ok ((some .undef, l), { w with windowListeners := w.windowListeners ++ [(t, f)] })) := rfl
+      some (.ok ((some .undef, l), w.setWindowListeners (w.windowListeners ++ [(t, f)]))) := rfl
 
 @[simp] theorem R_builtin_addEventListener (n : Nat) (t : String) (f : Value) (args : List Value)
     (l : Locals) (w : World) :
@@ -391,55 +392,253 @@ theorem ite_value_bool (c : Prop) [Decidable c] (a b : Bool) :
 theorem repr_natCast_eq_empty (n : Nat) : ((n : Int).repr = "") = False :=
   toString_natCast_eq_empty n
 
+/-! ## The `js_simp` simp set -/
+
+attribute [js_simp]
+  evalE
+  evalList
+  evalFields
+  execS
+  execB
+  execFor
+  R_pure
+  R_bind
+  R_map
+  R_ite_pure
+  ite_value_str
+  ite_value_bool
+  R_seqRight
+  R_throw
+  R_get
+  R_set
+  R_getThe
+  R_setWorld
+  R_modifyThe
+  Res.andThen_ok
+  Res.andThen_error
+  R_lookupVar
+  R_declVar_local
+  R_assignVar
+  R_callMethod_host
+  R_callMethod_node
+  R_callMethod_fn
+  R_callMethod_str
+  R_callMethod_concat
+  R_callMethod_map
+  R_callMethod_filter
+  R_callValue_String
+  R_getMember_obj
+  R_getMember_arr_length
+  R_getMember_node_value
+  R_getMember_node_checked
+  R_getMember_location_hash
+  R_setMember_value
+  R_setMember_checked
+  R_setMember_hidden
+  R_setMember_className
+  R_setMember_textContent
+  R_setMember_type
+  R_builtin_createElement
+  R_builtin_createTextNode
+  R_builtin_getItem
+  R_builtin_setItem
+  R_builtin_stringify
+  R_builtin_parse
+  R_builtin_assign
+  R_builtin_window_addEventListener
+  R_builtin_addEventListener
+  R_builtin_appendChild
+  R_builtin_replaceChildren
+  R_builtin_focus
+  R_builtin_bind
+  R_builtin_trim
+  R_builtin_concat
+  assocGet_cons
+  assocGet_nil
+  assocGet_assocSet
+  assocSet_nil
+  assocSet_cons
+  strictEq_num
+  strictEq_str
+  strictEq_bool
+  strictEq_null_str
+  strictEq_str_null
+  evalUnop
+  evalBinop
+  truthy
+  toStr
+  strArg
+  mergeObj
+  World.setGlobals_dom
+  World.setGlobals_globals
+  World.setGlobals_funcs
+  World.setGlobals_storage
+  World.setGlobals_hash
+  World.setGlobals_windowListeners
+  World.setStorage_dom
+  World.setStorage_globals
+  World.setStorage_funcs
+  World.setStorage_storage
+  World.setStorage_hash
+  World.setStorage_windowListeners
+  World.setGlobals_node
+  World.setStorage_node
+  World.setGlobals_setGlobals
+  World.setStorage_setStorage
+  World.modify_setGlobals
+  World.modify_setStorage
+  World.setGlobals_setStorage
+  World.alloc_fst_globals
+  World.alloc_fst_funcs
+  World.alloc_fst_storage
+  World.alloc_fst_hash
+  World.alloc_fst_windowListeners
+  World.alloc_fst_dom
+  World.alloc_snd
+  World.modify_globals
+  World.modify_funcs
+  World.modify_storage
+  World.modify_hash
+  World.modify_windowListeners
+  World.size_modify
+  World.size_replaceChildren
+  World.size_appendChild
+  World.alloc_modify_new
+  World.alloc_modify_old
+  World.modify_modify_same
+  World.node_alloc_eq
+  World.node_alloc_old
+  World.detach_globals
+  World.detach_funcs
+  World.detach_storage
+  World.detach_hash
+  World.detach_windowListeners
+  World.appendChild_globals
+  World.appendChild_funcs
+  World.appendChild_storage
+  World.appendChild_hash
+  World.appendChild_windowListeners
+  World.replaceChildren_globals
+  World.replaceChildren_funcs
+  World.replaceChildren_storage
+  World.replaceChildren_hash
+  World.replaceChildren_windowListeners
+  World.setTextContent_globals
+  World.setTextContent_funcs
+  World.setTextContent_storage
+  World.setTextContent_hash
+  World.setTextContent_windowListeners
+  World.node_modify_self
+  World.node_modify_ne
+  World.parent_modify_of
+  World.children_modify_of
+  World.appendChild_of_parent_none
+  World.replaceChildren_of_children_nil
+  World.setTextContent_eq
+  World.ancestors_of_parent_none
+  Array.size_push
+  List.mem_cons
+  List.not_mem_nil
+  or_false
+  or_true
+  false_or
+  true_or
+  List.contains_cons
+  List.contains_nil
+  List.flatten_cons
+  List.flatten_nil
+  List.cons_append
+  List.nil_append
+  List.getD_cons_zero
+  List.getD_cons_succ
+  List.drop
+  List.zipIdx_cons
+  List.zipIdx_nil
+  List.map_cons
+  List.map_nil
+  List.flatMap_cons
+  List.flatMap_nil
+  Option.map_some
+  Option.map_none
+  Option.getD_some
+  Option.getD_none
+  Option.isSome_some
+  Option.isSome_none
+  Function.comp_apply
+  ite_true
+  ite_false
+  decide_true
+  decide_false
+  Bool.not_true
+  Bool.not_false
+  beq_self_eq_true
+  ne_eq
+  not_false_eq_true
+  implies_true
+  false_implies
+  forall_const
+  forall_eq'
+  Option.some.injEq
+  eq_self_iff_true
+  decide_eq_true_eq
+  not_true_eq_false
+  decide_not
+  List.foldl_cons
+  List.foldl_nil
+  reduceCtorEq
+  Nat.add_one_ne_zero
+  true_and
+  and_true
+  false_and
+  and_false
+  Bool.true_and
+  Bool.false_and
+  Bool.and_true
+  Bool.or_false
+  Bool.false_or
+  Bool.true_or
+  Bool.or_true
+  List.any_cons
+  List.any_nil
+  String.reduceBEq
+  String.reduceEq
+  String.reduceAppend
+  reduceIte
+  Nat.reduceEqDiff
+  Int.reduceEq
+  Int.reduceNeg
+  Int.reduceGT
+  Int.reduceLT
+  Int.reduceSub
+  Int.reduceAdd
+  toString_natCast_eq_empty
+  Int.natCast_zero
+  Int.natCast_eq_zero
+  Int.natCast_pos
+  gt_iff_lt
+  Int.lt_irrefl
+  Nat.add_assoc
+  Nat.reduceAdd
+  Nat.add_lt_add_iff_left
+  Nat.reduceLT
+  Nat.lt_add_one
+  Nat.add_left_cancel_iff
+  nat_eq_self_add
+  nat_self_add_eq
+  nat_lt_self_add
+  Nat.one_ne_zero
+  Nat.succ_ne_zero
+  Nat.lt_irrefl
+  Nat.zero_lt_succ
+  Nat.zero_lt_one
+  beq_iff_eq
+
 /-- Symbolic execution: step through interpreter code with the lemmas above. -/
 syntax "js_simp" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic
 
 macro_rules
   | `(tactic| js_simp $[[$extra,*]]?) => do
     let extra := (extra.map (·.getElems)).getD #[]
-    `(tactic| simp (config := { maxSteps := 10000000, maxDischargeDepth := 12 }) only [
-      evalE, evalList, evalFields, execS, execB, execFor,
-      R_pure, R_bind, R_map, R_ite_pure, ite_value_str, ite_value_bool, R_seqRight, R_throw, R_get, R_set, R_getThe, R_setWorld, R_modifyThe,
-      Res.andThen_ok, Res.andThen_error,
-      R_lookupVar,
-      R_declVar_local, R_assignVar,
-      R_callMethod_host, R_callMethod_node, R_callMethod_fn, R_callMethod_str, R_callMethod_concat, R_callMethod_map, R_callMethod_filter, R_callValue_String,
-      R_getMember_obj, R_getMember_arr_length, R_getMember_node_value, R_getMember_node_checked,
-      R_getMember_location_hash,
-      R_setMember_value, R_setMember_checked, R_setMember_hidden, R_setMember_className,
-      R_setMember_textContent, R_setMember_type,
-      R_builtin_createElement, R_builtin_createTextNode, R_builtin_getItem, R_builtin_setItem,
-      R_builtin_stringify, R_builtin_parse, R_builtin_assign, R_builtin_window_addEventListener,
-      R_builtin_addEventListener, R_builtin_appendChild, R_builtin_replaceChildren, R_builtin_focus,
-      R_builtin_bind, R_builtin_trim, R_builtin_concat,
-      assocGet_cons, assocGet_nil, assocGet_assocSet, assocSet_nil, assocSet_cons, strictEq_num, strictEq_str, strictEq_bool,
-      strictEq_null_str, strictEq_str_null,
-      evalUnop, evalBinop, truthy, toStr, strArg, mergeObj,
-      World.alloc_fst_globals, World.alloc_fst_funcs, World.alloc_fst_storage, World.alloc_fst_hash,
-      World.alloc_fst_windowListeners, World.alloc_fst_dom, World.alloc_snd,
-      World.modify_globals, World.modify_funcs, World.modify_storage, World.modify_hash,
-      World.modify_windowListeners, World.size_modify, World.size_replaceChildren, World.size_appendChild,
-      World.alloc_modify_new, World.alloc_modify_old, World.modify_modify_same,
-      World.node_alloc_eq, World.node_alloc_old,
-      World.detach_globals, World.detach_funcs, World.detach_storage, World.detach_hash, World.detach_windowListeners, World.appendChild_globals, World.appendChild_funcs, World.appendChild_storage, World.appendChild_hash, World.appendChild_windowListeners, World.replaceChildren_globals, World.replaceChildren_funcs, World.replaceChildren_storage, World.replaceChildren_hash, World.replaceChildren_windowListeners, World.setTextContent_globals, World.setTextContent_funcs, World.setTextContent_storage, World.setTextContent_hash, World.setTextContent_windowListeners, World.node_modify_self, World.node_modify_ne,
-      World.parent_modify_of, World.children_modify_of,
-      World.appendChild_of_parent_none, World.replaceChildren_of_children_nil, World.setTextContent_eq,
-      World.ancestors_of_parent_none,
-      Array.size_push, List.mem_cons, List.not_mem_nil, or_false, or_true, false_or, true_or, List.contains_cons, List.contains_nil, List.flatten_cons, List.flatten_nil,
-      List.cons_append, List.nil_append, List.getD_cons_zero, List.getD_cons_succ, List.drop,
-      List.zipIdx_cons, List.zipIdx_nil, List.map_cons, List.map_nil, List.flatMap_cons, List.flatMap_nil,
-      Option.map_some, Option.map_none, Option.getD_some, Option.getD_none, Option.isSome_some,
-      Option.isSome_none, Function.comp_apply,
-      ite_true, ite_false, decide_true, decide_false, Bool.not_true, Bool.not_false,
-      beq_self_eq_true, ne_eq, not_false_eq_true, implies_true, false_implies, forall_const,
-      forall_eq', Option.some.injEq, eq_self_iff_true, decide_eq_true_eq, not_true_eq_false, decide_not, List.foldl_cons, List.foldl_nil, reduceCtorEq, Nat.add_one_ne_zero,
-      true_and, and_true, false_and, and_false, Bool.true_and, Bool.false_and, Bool.and_true,
-      Bool.or_false, Bool.false_or, Bool.true_or, Bool.or_true,
-      List.any_cons, List.any_nil, String.reduceBEq, String.reduceEq, String.reduceAppend, reduceIte, Nat.reduceEqDiff, Int.reduceEq, Int.reduceNeg, Int.reduceGT, Int.reduceLT, Int.reduceSub, Int.reduceAdd,
-      toString_natCast_eq_empty, Int.natCast_zero, Int.natCast_eq_zero, Int.natCast_pos, gt_iff_lt, Int.lt_irrefl,
-      Nat.add_assoc, Nat.reduceAdd, Nat.add_lt_add_iff_left, Nat.reduceLT, Nat.lt_add_one,
-      Nat.add_left_cancel_iff, nat_eq_self_add, nat_self_add_eq, nat_lt_self_add, Nat.one_ne_zero,
-      Nat.succ_ne_zero, Nat.lt_irrefl, Nat.zero_lt_succ, Nat.zero_lt_one, beq_iff_eq,
-      $extra,*])
+    `(tactic| simp (config := { maxSteps := 10000000, maxDischargeDepth := 12 }) only [js_simp, $extra,*])
 
 end JS

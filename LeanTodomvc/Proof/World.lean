@@ -109,6 +109,33 @@ theorem SameButDom.setTextContent (w : World) n s : SameButDom w (w.setTextConte
 @[simp] theorem setTextContent_windowListeners (w : World) (n : Nat) (t : String) : (w.setTextContent n t).windowListeners = w.windowListeners :=
   (SameButDom.setTextContent w n t).windowListeners
 
+/-! ## Setters -/
+
+section setters
+variable (w : World)
+@[simp] theorem setGlobals_dom g : (w.setGlobals g).dom = w.dom := rfl
+@[simp] theorem setGlobals_globals g : (w.setGlobals g).globals = g := rfl
+@[simp] theorem setGlobals_funcs g : (w.setGlobals g).funcs = w.funcs := rfl
+@[simp] theorem setGlobals_storage g : (w.setGlobals g).storage = w.storage := rfl
+@[simp] theorem setGlobals_hash g : (w.setGlobals g).hash = w.hash := rfl
+@[simp] theorem setGlobals_windowListeners g : (w.setGlobals g).windowListeners = w.windowListeners := rfl
+@[simp] theorem setStorage_dom st : (w.setStorage st).dom = w.dom := rfl
+@[simp] theorem setStorage_globals st : (w.setStorage st).globals = w.globals := rfl
+@[simp] theorem setStorage_funcs st : (w.setStorage st).funcs = w.funcs := rfl
+@[simp] theorem setStorage_storage st : (w.setStorage st).storage = st := rfl
+@[simp] theorem setStorage_hash st : (w.setStorage st).hash = w.hash := rfl
+@[simp] theorem setStorage_windowListeners st : (w.setStorage st).windowListeners = w.windowListeners := rfl
+@[simp] theorem setHash_dom h : (w.setHash h).dom = w.dom := rfl
+@[simp] theorem setHash_globals h : (w.setHash h).globals = w.globals := rfl
+@[simp] theorem setHash_funcs h : (w.setHash h).funcs = w.funcs := rfl
+@[simp] theorem setHash_storage h : (w.setHash h).storage = w.storage := rfl
+@[simp] theorem setHash_hash h : (w.setHash h).hash = h := rfl
+@[simp] theorem setHash_windowListeners h : (w.setHash h).windowListeners = w.windowListeners := rfl
+@[simp] theorem setGlobals_node g k : (w.setGlobals g).node k = w.node k := rfl
+@[simp] theorem setStorage_node st k : (w.setStorage st).node k = w.node k := rfl
+@[simp] theorem setHash_node h k : (w.setHash h).node k = w.node k := rfl
+end setters
+
 /-! ## Nodes -/
 
 @[simp] theorem size_modify (w : World) n f : (w.modify n f).dom.size = w.dom.size := Array.size_modify
@@ -572,5 +599,42 @@ theorem parentWF_setTextContent {w : World} {n : Nat} {s : String} (h : ParentWF
   · exact parentWF_replaceChildren h
   · apply parentWF_appendChild _ (by simp) (by simpa using Nat.lt_succ_of_lt hn)
     exact parentWF_alloc (parentWF_replaceChildren h) (parentLt_replaceChildren hl) (by simp)
+
+/-! ## The setters do not affect the DOM properties -/
+
+theorem chain_congr {w w' : World} (h : ∀ k, w'.node k = w.node k) {n : Nat} {l : List Nat} :
+    Chain w' n l ↔ Chain w n l :=
+  ⟨fun hc => hc.frame fun x _ => by rw [h], fun hc => hc.frame fun x _ => by rw [h]⟩
+
+@[simp] theorem chain_setGlobals (w : World) g n l : Chain (w.setGlobals g) n l ↔ Chain w n l :=
+  chain_congr (w := w) (w' := w.setGlobals g) (fun _ => rfl)
+@[simp] theorem chain_setStorage (w : World) st n l : Chain (w.setStorage st) n l ↔ Chain w n l :=
+  chain_congr (w := w) (w' := w.setStorage st) (fun _ => rfl)
+@[simp] theorem chain_setHash (w : World) h n l : Chain (w.setHash h) n l ↔ Chain w n l :=
+  chain_congr (w := w) (w' := w.setHash h) (fun _ => rfl)
+@[simp] theorem parentLt_setGlobals (w : World) g : ParentLt (w.setGlobals g) ↔ ParentLt w :=
+  ⟨fun h => ⟨h.lt⟩, fun h => ⟨h.lt⟩⟩
+@[simp] theorem parentLt_setStorage (w : World) st : ParentLt (w.setStorage st) ↔ ParentLt w :=
+  ⟨fun h => ⟨h.lt⟩, fun h => ⟨h.lt⟩⟩
+@[simp] theorem parentLt_setHash (w : World) h : ParentLt (w.setHash h) ↔ ParentLt w :=
+  ⟨fun h => ⟨h.lt⟩, fun h => ⟨h.lt⟩⟩
+@[simp] theorem parentWF_setGlobals (w : World) g : ParentWF (w.setGlobals g) ↔ ParentWF w :=
+  ⟨fun h => ⟨h.wf⟩, fun h => ⟨h.wf⟩⟩
+@[simp] theorem parentWF_setStorage (w : World) st : ParentWF (w.setStorage st) ↔ ParentWF w :=
+  ⟨fun h => ⟨h.wf⟩, fun h => ⟨h.wf⟩⟩
+@[simp] theorem parentWF_setHash (w : World) h : ParentWF (w.setHash h) ↔ ParentWF w :=
+  ⟨fun h => ⟨h.wf⟩, fun h => ⟨h.wf⟩⟩
+
+@[simp] theorem setGlobals_setGlobals (w : World) g g' : (w.setGlobals g).setGlobals g' = w.setGlobals g' := rfl
+@[simp] theorem setStorage_setStorage (w : World) st st' :
+    (w.setStorage st).setStorage st' = w.setStorage st' := rfl
+theorem modify_setGlobals (w : World) g n f : (w.setGlobals g).modify n f = (w.modify n f).setGlobals g := rfl
+theorem modify_setStorage (w : World) st n f : (w.setStorage st).modify n f = (w.modify n f).setStorage st := rfl
+theorem setGlobals_setStorage (w : World) g st : (w.setStorage st).setGlobals g = (w.setGlobals g).setStorage st := rfl
+
+theorem chain_modify_iff {w : World} {n : Nat} {f : Node → Node} (hf : ∀ nd, (f nd).parent = nd.parent)
+    (k : Nat) (l : List Nat) : Chain (w.modify n f) k l ↔ Chain w k l :=
+  ⟨fun hc => hc.frame fun x _ => (parent_modify_of _ _ _ _ hf).symm,
+   fun hc => hc.frame fun x _ => parent_modify_of _ _ _ _ hf⟩
 
 end World
