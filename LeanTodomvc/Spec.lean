@@ -290,12 +290,10 @@ theorem bounded_invariant :
   revert s
   native_decide
 
-/-! ## Open obligations
+/-! ## Unbounded results
 
-These are the full, unbounded statements. Proving them needs inductive
-invariants for the app, and reasoning about the interpreter on *symbolic*
-states. This is not done yet. -/
-
-theorem invariant_holds : Sat specInvariant := by sorry
+`TodoMVC.invariant_holds : Sat specInvariant` is proved in
+`LeanTodomvc/Proof/Main.lean`, by symbolic execution of the script against
+an abstract model of the app. -/
 
 end TodoMVC

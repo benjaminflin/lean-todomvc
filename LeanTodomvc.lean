@@ -20,3 +20,5 @@ import LeanTodomvc.Proof.Observe
 import LeanTodomvc.Proof.Step
 import LeanTodomvc.Proof.Classify
 import LeanTodomvc.Proof.Dispatch
+import LeanTodomvc.Proof.Init
+import LeanTodomvc.Proof.Main

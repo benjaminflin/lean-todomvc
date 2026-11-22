@@ -134,6 +134,21 @@ variable (w : World)
 @[simp] theorem setGlobals_node g k : (w.setGlobals g).node k = w.node k := rfl
 @[simp] theorem setStorage_node st k : (w.setStorage st).node k = w.node k := rfl
 @[simp] theorem setHash_node h k : (w.setHash h).node k = w.node k := rfl
+@[simp] theorem setFuncs_dom fs : (w.setFuncs fs).dom = w.dom := rfl
+@[simp] theorem setFuncs_globals fs : (w.setFuncs fs).globals = w.globals := rfl
+@[simp] theorem setFuncs_funcs fs : (w.setFuncs fs).funcs = fs := rfl
+@[simp] theorem setFuncs_storage fs : (w.setFuncs fs).storage = w.storage := rfl
+@[simp] theorem setFuncs_hash fs : (w.setFuncs fs).hash = w.hash := rfl
+@[simp] theorem setFuncs_windowListeners fs : (w.setFuncs fs).windowListeners = w.windowListeners := rfl
+@[simp] theorem setFuncs_node fs k : (w.setFuncs fs).node k = w.node k := rfl
+@[simp] theorem setWindowListeners_dom ls : (w.setWindowListeners ls).dom = w.dom := rfl
+@[simp] theorem setWindowListeners_globals ls : (w.setWindowListeners ls).globals = w.globals := rfl
+@[simp] theorem setWindowListeners_funcs ls : (w.setWindowListeners ls).funcs = w.funcs := rfl
+@[simp] theorem setWindowListeners_storage ls : (w.setWindowListeners ls).storage = w.storage := rfl
+@[simp] theorem setWindowListeners_hash ls : (w.setWindowListeners ls).hash = w.hash := rfl
+@[simp] theorem setWindowListeners_windowListeners ls :
+    (w.setWindowListeners ls).windowListeners = ls := rfl
+@[simp] theorem setWindowListeners_node ls k : (w.setWindowListeners ls).node k = w.node k := rfl
 end setters
 
 /-! ## Nodes -/

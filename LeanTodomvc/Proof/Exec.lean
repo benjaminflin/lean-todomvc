@@ -470,6 +470,20 @@ attribute [js_simp]
   strArg
   mergeObj
   World.setGlobals_dom
+  World.setFuncs_dom
+  World.setFuncs_globals
+  World.setFuncs_funcs
+  World.setFuncs_storage
+  World.setFuncs_hash
+  World.setFuncs_windowListeners
+  World.setFuncs_node
+  World.setWindowListeners_dom
+  World.setWindowListeners_globals
+  World.setWindowListeners_funcs
+  World.setWindowListeners_storage
+  World.setWindowListeners_hash
+  World.setWindowListeners_windowListeners
+  World.setWindowListeners_node
   World.setGlobals_globals
   World.setGlobals_funcs
   World.setGlobals_storage
@@ -632,6 +646,13 @@ attribute [js_simp]
   Nat.zero_lt_succ
   Nat.zero_lt_one
   beq_iff_eq
+  World.setHash_dom
+  World.setHash_globals
+  World.setHash_funcs
+  World.setHash_storage
+  World.setHash_hash
+  World.setHash_windowListeners
+  World.setHash_node
 
 /-- Symbolic execution: step through interpreter code with the lemmas above. -/
 syntax "js_simp" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic

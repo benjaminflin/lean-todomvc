@@ -352,12 +352,20 @@ def M.run' {α} (m : M α) (w : World) : Option (Except String (α × World)) :=
   | some (.error e) => some (.error e)
   | none => none
 
+/-- Add the top-level function declarations of `prog` to `fs`, in order. -/
+def hoistFuncs (prog : List Stmt) (fs : List (String × FunDef)) : List (String × FunDef) :=
+  prog.foldl (fun fs s => match s with
+    | .funDecl name ps body => assocSet fs name ⟨ps, body⟩
+    | _ => fs) fs
+
+def Stmt.isFunDecl : Stmt → Bool
+  | .funDecl .. => true
+  | _ => false
+
 /-- Hoist the top-level function declarations, then run the script. -/
 def runScript (prog : List Stmt) : M Unit := do
-  for s in prog do
-    if let .funDecl name ps body := s then
-      modifyThe World fun w => w.setFuncs (assocSet w.funcs name ⟨ps, body⟩)
-  let _ ← execB (prog.filter fun | .funDecl .. => false | _ => true)
+  modifyThe World fun w => w.setFuncs (hoistFuncs prog w.funcs)
+  let _ ← execB (prog.filter fun s => !s.isFunDecl)
 
 /-- Call each listener in turn with the event object. -/
 def fireListeners (ls : List Value) (ev : Value) : M Unit := do
