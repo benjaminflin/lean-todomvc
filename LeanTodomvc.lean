@@ -6,6 +6,7 @@ import LeanTodomvc.JS.Notation
 import LeanTodomvc.System
 import LeanTodomvc.App
 import LeanTodomvc.Debug
+import LeanTodomvc.Emit
 import LeanTodomvc.Mu
 import LeanTodomvc.Spec
 import LeanTodomvc.Proof.SimpAttr
