@@ -15,3 +15,4 @@ import LeanTodomvc.Proof.Funcs
 import LeanTodomvc.Proof.Render
 import LeanTodomvc.Proof.RenderRep
 import LeanTodomvc.Proof.Handlers
+import LeanTodomvc.Proof.JsonRT
