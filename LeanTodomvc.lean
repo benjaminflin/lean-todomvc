@@ -16,3 +16,4 @@ import LeanTodomvc.Proof.Render
 import LeanTodomvc.Proof.RenderRep
 import LeanTodomvc.Proof.Handlers
 import LeanTodomvc.Proof.JsonRT
+import LeanTodomvc.Proof.Observe
