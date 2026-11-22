@@ -43,11 +43,12 @@ def Model.activeCount (m : Model) : Nat := (m.todos.filter (!·.completed)).leng
 
 def Model.allDone (m : Model) : Bool := !m.todos.isEmpty && m.todos.all (·.completed)
 
-/-- Model invariants: ids are distinct, non-negative, and below `nextId`. -/
+/-- Model invariants: ids are distinct, non-negative, and below `nextId`, which is non-negative. -/
 structure Model.WF (m : Model) : Prop where
   nodup : (m.todos.map (·.id)).Nodup
   nonneg : ∀ t ∈ m.todos, 0 ≤ t.id
   lt : ∀ t ∈ m.todos, t.id < m.nextId
+  nextId_nonneg : 0 ≤ m.nextId
 
 /-- Node indices of the static elements the script refers to. -/
 abbrev nNewTodo : Nat := 5
