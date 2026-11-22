@@ -1,6 +1,6 @@
 # lean-todomvc
 
-A [TodoMVC](https://github.com/tastejs/todomvc) app whose behaviour is 'proved in
+A [TodoMVC](https://github.com/tastejs/todomvc) app whose behaviour is proved in
 Lean 4 against a model of JavaScript and the DOM.
 
 The app is ordinary vanilla JavaScript plus the standard TodoMVC markup. Both
