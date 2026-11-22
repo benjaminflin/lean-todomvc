@@ -12,3 +12,4 @@ import LeanTodomvc.Proof.Exec
 import LeanTodomvc.Proof.Model
 import LeanTodomvc.Proof.Funcs
 import LeanTodomvc.Proof.Render
+import LeanTodomvc.Proof.RenderRep

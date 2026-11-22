@@ -71,10 +71,24 @@ def globalsOf (m : Model) : List (String × Value) :=
 
 def selectedIf (b : Bool) : String := if b then "selected" else ""
 
-/-- The static nodes `0 … 24`. `v5`/`v7` are the (user-editable) values of the
-new-todo field and the toggle-all checkbox; `lis` and `cnt` are the children of
-the todo list and the counter. -/
-def staticNode (m : Model) (v5 v7 : String) (lis cnt : List Nat) : Nat → Node
+/-- The dynamic parts of the static nodes. -/
+structure Dyn where
+  /-- value of the new-todo field (edited by the user) -/
+  v5 : String
+  /-- value of the toggle-all checkbox (edited by the user) -/
+  v7 : String
+  mainHidden : Bool
+  footerHidden : Bool
+  toggleChecked : Bool
+  clearHidden : Bool
+  clsAll : String
+  clsActive : String
+  clsCompleted : String
+  lis : List Nat
+  cnt : List Nat
+
+/-- The static nodes `0 … 24`, given their dynamic parts. -/
+def staticNodeD (d : Dyn) : Nat → Node
   | 0 => { tag := "body", children := [1] }
   | 1 => { tag := "section", className := "todoapp", children := [2, 6, 11], parent := some 0 }
   | 2 => { tag := "header", className := "header", children := [3, 5], parent := some 1 }
@@ -82,37 +96,53 @@ def staticNode (m : Model) (v5 v7 : String) (lis cnt : List Nat) : Nat → Node
   | 4 => { tag := "#text", text := "todos", parent := some 3 }
   | 5 => { tag := "input", className := "new-todo",
            attrs := [("placeholder", "What needs to be done?"), ("autofocus", "")],
-           value := v5, parent := some 2, listeners := [("keydown", .fn "onNewTodoKey" [])] }
-  | 6 => { tag := "section", className := "main", hidden := m.todos.isEmpty,
+           value := d.v5, parent := some 2, listeners := [("keydown", .fn "onNewTodoKey" [])] }
+  | 6 => { tag := "section", className := "main", hidden := d.mainHidden,
            children := [7, 8, 10], parent := some 1 }
   | 7 => { tag := "input", id := "toggle-all", className := "toggle-all", attrs := [("type", "checkbox")],
-           value := v7, checked := m.allDone, parent := some 6,
+           value := d.v7, checked := d.toggleChecked, parent := some 6,
            listeners := [("click", .fn "onToggleAll" [])] }
   | 8 => { tag := "label", attrs := [("for", "toggle-all")], children := [9], parent := some 6 }
   | 9 => { tag := "#text", text := "Mark all as complete", parent := some 8 }
-  | 10 => { tag := "ul", className := "todo-list", children := lis, parent := some 6 }
-  | 11 => { tag := "footer", className := "footer", hidden := m.todos.isEmpty,
+  | 10 => { tag := "ul", className := "todo-list", children := d.lis, parent := some 6 }
+  | 11 => { tag := "footer", className := "footer", hidden := d.footerHidden,
             children := [12, 13, 23], parent := some 1 }
-  | 12 => { tag := "span", className := "todo-count", children := cnt, parent := some 11 }
+  | 12 => { tag := "span", className := "todo-count", children := d.cnt, parent := some 11 }
   | 13 => { tag := "ul", className := "filters", children := [14, 17, 20], parent := some 11 }
   | 14 => { tag := "li", children := [15], parent := some 13 }
-  | 15 => { tag := "a", id := "filter-all", className := selectedIf (filterStr m.hash = "all"),
+  | 15 => { tag := "a", id := "filter-all", className := d.clsAll,
             attrs := [("href", "#/")], children := [16], parent := some 14 }
   | 16 => { tag := "#text", text := "All", parent := some 15 }
   | 17 => { tag := "li", children := [18], parent := some 13 }
-  | 18 => { tag := "a", id := "filter-active", className := selectedIf (filterStr m.hash = "active"),
+  | 18 => { tag := "a", id := "filter-active", className := d.clsActive,
             attrs := [("href", "#/active")], children := [19], parent := some 17 }
   | 19 => { tag := "#text", text := "Active", parent := some 18 }
   | 20 => { tag := "li", children := [21], parent := some 13 }
-  | 21 => { tag := "a", id := "filter-completed",
-            className := selectedIf (filterStr m.hash = "completed"),
+  | 21 => { tag := "a", id := "filter-completed", className := d.clsCompleted,
             attrs := [("href", "#/completed")], children := [22], parent := some 20 }
   | 22 => { tag := "#text", text := "Completed", parent := some 21 }
-  | 23 => { tag := "button", className := "clear-completed",
-            hidden := !m.todos.any (·.completed), children := [24], parent := some 11,
-            listeners := [("click", .fn "clearCompleted" [])] }
+  | 23 => { tag := "button", className := "clear-completed", hidden := d.clearHidden,
+            children := [24], parent := some 11, listeners := [("click", .fn "clearCompleted" [])] }
   | 24 => { tag := "#text", text := "Clear completed", parent := some 23 }
   | _ => default
+
+/-- The dynamic parts as they should be for the model `m`. -/
+def Model.dyn (m : Model) (v5 v7 : String) (lis cnt : List Nat) : Dyn where
+  v5 := v5
+  v7 := v7
+  mainHidden := m.todos.isEmpty
+  footerHidden := m.todos.isEmpty
+  toggleChecked := m.allDone
+  clearHidden := !m.todos.any (·.completed)
+  clsAll := selectedIf (filterStr m.hash = "all")
+  clsActive := selectedIf (filterStr m.hash = "active")
+  clsCompleted := selectedIf (filterStr m.hash = "completed")
+  lis := lis
+  cnt := cnt
+
+/-- The static nodes for the model `m`. -/
+def staticNode (m : Model) (v5 v7 : String) (lis cnt : List Nat) : Nat → Node :=
+  staticNodeD (m.dyn v5 v7 lis cnt)
 
 /-! ## Rendered todo items
 
@@ -179,17 +209,13 @@ def Counter (w : World) (c : Nat) (n : Nat) : Prop :=
 
 /-! ## Well-formedness of the DOM -/
 
-/-- Parent pointers agree with child lists. -/
-def ParentWF (w : World) : Prop :=
-  ∀ k p, (w.node k).parent = some p → k ∈ (w.node p).children
-
 /-- The document of `w` represents `m`. -/
 structure DomRep (m : Model) (w : World) : Prop where
   size : 25 ≤ w.dom.size
   static : ∃ v5 v7 lis c, (∀ k < 25, w.node k = staticNode m v5 v7 lis [c, c + 2] k) ∧
     List.Forall₂ (fun b t => Block w b t (m.editingId = t.id) (some nList)) lis m.shown ∧
     Counter w c m.activeCount
-  wf : ParentWF w
+  wf : World.ParentWF w
   lt : World.ParentLt w
 
 def storageRep (m : Model) (st : List (String × String)) : Prop :=

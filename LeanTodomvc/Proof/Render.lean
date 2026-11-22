@@ -212,6 +212,39 @@ theorem parentLt_loopW (m : Model) : ∀ (ts : List TodoR) (w : World), ParentLt
   | t :: ts, w, h, hs => parentLt_loopW m ts _ (parentLt_attachTodo h hs)
       (Nat.le_trans hs (attachTodo_size_ge m w t))
 
+/-- The indices of the `<li>`s appended by the loop. -/
+def lisOf (m : Model) : List TodoR → World → List Nat
+  | [], _ => []
+  | t :: ts, w => (if shows (filterStr m.hash) t then [w.dom.size] else []) ++ lisOf m ts (attachTodo m w t)
+
+theorem attachTodo_node_old (m : Model) (w : World) (t : TodoR) {k : Nat} (hk : k < w.dom.size) :
+    (attachTodo m w t).node k =
+      if k = nList ∧ shows (filterStr m.hash) t then
+        { w.node k with children := (w.node k).children ++ [w.dom.size] }
+      else w.node k := by
+  unfold attachTodo
+  split
+  · rename_i hsh
+    rw [appendChild_of_parent_none _ _ _ (renderTodoW_li_parent _ _ _), node_modify, node_modify]
+    have hk' : ¬ (w.dom.size = k) := by omega
+    simp only [hk', false_and, ite_false, renderTodoW_size]
+    by_cases h10 : nList = k
+    · subst h10
+      simp [hk, renderTodoW_node_old _ _ _ hk, hsh, Nat.lt_add_right]
+    · simp [h10, Ne.symm h10, renderTodoW_node_old _ _ _ hk]
+  · rename_i hsh; simp [hsh]
+
+theorem loopW_node_old (m : Model) : ∀ (ts : List TodoR) (w : World) (k : Nat), k < w.dom.size →
+    (loopW m ts w).node k =
+      if k = nList then { w.node k with children := (w.node k).children ++ lisOf m ts w } else w.node k
+  | [], w, k, _ => by by_cases h : k = nList <;> simp [loopW, lisOf, h]
+  | t :: ts, w, k, hk => by
+    show (loopW m ts (attachTodo m w t)).node k = _
+    rw [loopW_node_old m ts _ k (Nat.lt_of_lt_of_le hk (attachTodo_size_ge m w t)), attachTodo_node_old m w t hk]
+    by_cases h : k = nList
+    · subst h; by_cases hsh : shows (filterStr m.hash) t <;> simp [lisOf, hsh]
+    · simp [h, lisOf]
+
 /-! ## `render()` -/
 
 def countChain : List Nat := [nCount, nFooter, 1, 0]

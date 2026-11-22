@@ -239,6 +239,11 @@ theorem size_foldl_modify (cs : List Nat) (f : Nat → Node → Node) :
     (w.appendChild p c).dom.size = w.dom.size := by
   simp [World.appendChild]
 
+theorem size_setTextContent (w : World) (n : Nat) (s : String) :
+    (w.setTextContent n s).dom.size = if s = "" then w.dom.size else w.dom.size + 1 := by
+  rw [setTextContent_eq]
+  split <;> simp
+
 /-! ## Ancestor chains -/
 
 /-- `Chain w n l`: following parent pointers from `n` visits exactly `l`. -/
@@ -314,6 +319,34 @@ theorem parent_replaceChildren_of_not_mem (w : World) (p k : Nat) (hk : k ∉ (w
 theorem Chain.replaceChildren {w : World} {n p : Nat} {l : List Nat} (hc : Chain w n l)
     (hl : ∀ x ∈ l, x ∉ (w.node p).children) : Chain (w.replaceChildren p) n l :=
   hc.frame fun x hx => parent_replaceChildren_of_not_mem w p x (hl x hx)
+
+theorem node_foldl_none (cs : List Nat) (k : Nat) :
+    ∀ w : World, (cs.foldl (fun w c => w.modify c fun nd => { nd with parent := none }) w).node k =
+      if k ∈ cs ∧ k < w.dom.size then { w.node k with parent := none } else w.node k := by
+  induction cs with
+  | nil => intro w; simp
+  | cons c cs ih =>
+    intro w
+    rw [List.foldl_cons, ih, size_modify, node_modify]
+    by_cases hc : c = k
+    · subst hc; by_cases hs : c < w.dom.size <;> by_cases hm : c ∈ cs <;> simp [hs, hm]
+    · simp only [hc, false_and, ite_false, List.mem_cons, Ne.symm hc, false_or]
+
+theorem node_replaceChildren (w : World) (p k : Nat) :
+    (w.replaceChildren p).node k =
+      if k = p ∧ p < w.dom.size then
+        { (if k ∈ (w.node p).children then { w.node k with parent := none } else w.node k) with children := [] }
+      else if k ∈ (w.node p).children ∧ k < w.dom.size then { w.node k with parent := none }
+      else w.node k := by
+  unfold World.replaceChildren
+  simp only
+  rw [node_modify, size_foldl_modify, node_foldl_none]
+  by_cases h1 : k = p
+  · subst h1
+    by_cases h2 : k < w.dom.size
+    · by_cases h3 : k ∈ (w.node k).children <;> simp [h2, h3]
+    · simp [h2]
+  · simp [h1, Ne.symm h1]
 
 /-! ## Parents have smaller indices than their children -/
 
@@ -407,5 +440,137 @@ theorem parentLt_setTextContent {w : World} {n : Nat} {s : String} (h : ParentLt
   · exact parentLt_replaceChildren h
   · apply parentLt_appendChild _ (by simpa using hn)
     exact parentLt_alloc (parentLt_replaceChildren h) (by simp)
+
+/-! ## Parent pointers agree with child lists -/
+
+/-- Every node is in the child list of its parent. -/
+structure ParentWF (w : World) : Prop where
+  wf : ∀ (k p : Nat), (w.node k).parent = some p → k ∈ (w.node p).children
+
+theorem lt_size_of_parent {w : World} {k p : Nat} (hk : (w.node k).parent = some p) : k < w.dom.size := by
+  by_cases hc : k < w.dom.size
+  · exact hc
+  · rw [node_of_size_le w k (by omega)] at hk; cases hk
+
+theorem parentWF_alloc {w : World} {nd : Node} (h : ParentWF w) (hl : ParentLt w)
+    (hn : ∀ p, nd.parent = some p → w.dom.size ∈ (w.node p).children) : ParentWF (w.alloc nd).1 := by
+  refine ⟨fun k p hk => ?_⟩
+  rw [node_alloc] at hk
+  split at hk
+  · subst_vars
+    have hp := hn p hk
+    have hps : p < w.dom.size := by
+      by_cases hc : p < w.dom.size
+      · exact hc
+      · rw [node_of_size_le w p (by omega)] at hp; exact (List.not_mem_nil hp).elim
+    rw [node_alloc_old _ _ _ (by omega)]
+    exact hp
+  · have hks := lt_size_of_parent hk
+    have hpk := hl.lt k p hk
+    rw [node_alloc_old _ _ _ (by omega)]
+    exact h.wf k p hk
+
+theorem parentWF_modify_of {w : World} {n : Nat} {f : Node → Node} (h : ParentWF w)
+    (hp : ∀ nd, (f nd).parent = nd.parent) (hc : ∀ nd, ∀ x ∈ nd.children, x ∈ (f nd).children) :
+    ParentWF (w.modify n f) := by
+  refine ⟨fun k p hk => ?_⟩
+  rw [parent_modify_of _ _ _ _ hp] at hk
+  have := h.wf k p hk
+  rw [node_modify]
+  split
+  · rename_i hc'; obtain ⟨rfl, -⟩ := hc'; exact hc _ _ this
+  · exact this
+
+theorem parentWF_modify_parent {w : World} {c p : Nat} (h : ParentWF w)
+    (hc : c ∈ (w.node p).children) : ParentWF (w.modify c fun nd => { nd with parent := some p }) := by
+  refine ⟨fun k q hk => ?_⟩
+  rw [children_modify_of (f := fun nd => { nd with parent := some p }) _ _ _ (fun _ => rfl)]
+  rw [node_modify] at hk
+  split at hk
+  · rename_i hk'; obtain ⟨rfl, -⟩ := hk'; cases hk; exact hc
+  · exact h.wf k q hk
+
+theorem parentWF_foldl_none (cs : List Nat) :
+    ∀ w : World, ParentWF w →
+      ParentWF (cs.foldl (fun w c => w.modify c fun nd => { nd with parent := none }) w) := by
+  induction cs with
+  | nil => intro w h; exact h
+  | cons c cs ih =>
+    intro w h
+    apply ih
+    refine ⟨fun k q hk => ?_⟩
+    rw [children_modify_of (f := fun nd => { nd with parent := none }) _ _ _ (fun _ => rfl)]
+    rw [node_modify] at hk
+    split at hk
+    · cases hk
+    · exact h.wf k q hk
+
+theorem children_replaceChildren_ne (w : World) (p q : Nat) (hq : q ≠ p) :
+    ((w.replaceChildren p).node q).children = (w.node q).children := by
+  rw [node_replaceChildren]
+  simp only [hq, false_and, ite_false]
+  split <;> rfl
+
+theorem parentWF_replaceChildren {w : World} {p : Nat} (h : ParentWF w) :
+    ParentWF (w.replaceChildren p) := by
+  refine ⟨fun k q hk => ?_⟩
+  have hks : k < w.dom.size := by
+    have := lt_size_of_parent hk; simpa using this
+  rw [node_replaceChildren] at hk
+  by_cases hkp : k = p ∧ p < w.dom.size
+  · obtain ⟨rfl, hs⟩ := hkp
+    simp only [hs, and_self, ite_true] at hk
+    split at hk
+    · cases hk
+    · rename_i hm
+      have hw := h.wf k q hk
+      have hqk : q ≠ k := fun e => by subst e; exact hm hw
+      rw [children_replaceChildren_ne _ _ _ hqk]; exact hw
+  · simp only [hkp, ite_false] at hk
+    split at hk
+    · cases hk
+    · rename_i hm
+      have hw := h.wf k q hk
+      by_cases hqp : q = p
+      · subst hqp; exact absurd ⟨hw, hks⟩ hm
+      · rw [children_replaceChildren_ne _ _ _ hqp]; exact hw
+
+theorem parentWF_detach {w : World} {c : Nat} (h : ParentWF w) : ParentWF (w.detach c) := by
+  unfold World.detach
+  split
+  · exact h
+  · rename_i q hq
+    refine ⟨fun k p hk => ?_⟩
+    rw [node_modify] at hk
+    split at hk
+    · cases hk
+    · rename_i hkc
+      rw [parent_modify_of (f := fun nd => { nd with children := nd.children.filter (· != c) }) _ _ _
+        (fun _ => rfl)] at hk
+      rw [children_modify_of (f := fun nd => { nd with parent := none }) _ _ _ (fun _ => rfl), node_modify]
+      have hw := h.wf k p hk
+      have hck : c ≠ k := by
+        intro e; subst e; exact hkc ⟨rfl, by simpa using lt_size_of_parent hk⟩
+      split
+      · rename_i he; obtain ⟨rfl, -⟩ := he
+        simp only [List.mem_filter, bne_iff_ne, ne_eq]
+        exact ⟨hw, fun e => hck e.symm⟩
+      · exact hw
+
+theorem parentWF_appendChild {w : World} {p c : Nat} (h : ParentWF w) (hc : c < w.dom.size)
+    (hp : p < w.dom.size) : ParentWF (w.appendChild p c) := by
+  unfold World.appendChild
+  apply parentWF_modify_parent
+  · exact parentWF_modify_of (parentWF_detach h) (fun _ => rfl) (fun nd x hx => by simp [hx])
+  · rw [node_modify_self _ _ _ (by simpa using hp)]
+    simp
+
+theorem parentWF_setTextContent {w : World} {n : Nat} {s : String} (h : ParentWF w) (hl : ParentLt w)
+    (hn : n < w.dom.size) : ParentWF (w.setTextContent n s) := by
+  rw [setTextContent_eq]
+  split
+  · exact parentWF_replaceChildren h
+  · apply parentWF_appendChild _ (by simp) (by simpa using Nat.lt_succ_of_lt hn)
+    exact parentWF_alloc (parentWF_replaceChildren h) (parentLt_replaceChildren hl) (by simp)
 
 end World

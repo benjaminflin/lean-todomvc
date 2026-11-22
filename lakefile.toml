@@ -6,7 +6,7 @@ defaultTargets = ["LeanTodomvc"]
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 relaxedAutoImplicit = false
-weak.linter.mathlibStandardSet = true
+weak.linter.mathlibStandardSet = false
 weak.linter.style.header = false
 weak.linter.style.longLine = false
 weak.linter.unusedSimpArgs = false

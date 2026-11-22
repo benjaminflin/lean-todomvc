@@ -388,6 +388,9 @@ theorem ite_value_bool (c : Prop) [Decidable c] (a b : Bool) :
     (if c then Value.bool a else Value.bool b) = Value.bool (if c then a else b) := by
   split <;> rfl
 
+theorem repr_natCast_eq_empty (n : Nat) : ((n : Int).repr = "") = False :=
+  toString_natCast_eq_empty n
+
 /-- Symbolic execution: step through interpreter code with the lemmas above. -/
 syntax "js_simp" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic
 
