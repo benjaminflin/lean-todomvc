@@ -158,4 +158,145 @@ theorem spec_loop (m : Model) : ∀ (ts : List TodoR) (ls : List (String × Valu
       js_simp [loopBody, hf, hg, globalsOf, funcs, hls, spec_isShown hf hg, hsh]
       exact ih'
 
+theorem loopW_same (m : Model) : ∀ (ts : List TodoR) (w : World), SameButDom w (loopW m ts w)
+  | [], w => .refl w
+  | t :: ts, w => (attachTodo_same m w t).trans (loopW_same m ts _)
+
+theorem loopW_size_ge (m : Model) : ∀ (ts : List TodoR) (w : World), w.dom.size ≤ (loopW m ts w).dom.size
+  | [], _ => Nat.le_refl _
+  | t :: ts, w => Nat.le_trans (attachTodo_size_ge m w t) (loopW_size_ge m ts _)
+
+theorem loopW_parent_old (m : Model) : ∀ (ts : List TodoR) (w : World) (k : Nat), k < w.dom.size →
+    ((loopW m ts w).node k).parent = (w.node k).parent
+  | [], _, _, _ => rfl
+  | t :: ts, w, k, hk => by
+    show ((loopW m ts (attachTodo m w t)).node k).parent = _
+    rw [loopW_parent_old m ts _ k (Nat.lt_of_lt_of_le hk (attachTodo_size_ge m w t)),
+      attachTodo_parent_old m w t hk]
+
+theorem blockNode_parent (b : Nat) (t : TodoR) (ed : Bool) (par : Option Nat) (v2 ve : String)
+    (i p : Nat) (h : (blockNode b t ed par v2 ve i).parent = some p) :
+    (i = 0 ∧ par = some p) ∨ p < b + i := by
+  match i with
+  | 0 => left; exact ⟨rfl, h⟩
+  | 1 => right; simp [blockNode] at h; omega
+  | 2 => right; simp [blockNode] at h; omega
+  | 3 => right; simp [blockNode] at h; omega
+  | i + 4 =>
+    right
+    simp only [blockNode] at h
+    split_ifs at h <;> cases h <;> omega
+
+theorem parentLt_renderTodoW {w : World} {t : TodoR} {ed : Bool} (h : ParentLt w) :
+    ParentLt (renderTodoW w t ed) := by
+  refine ⟨fun k p hk => ?_⟩
+  unfold renderTodoW at hk
+  rw [allocMany_node] at hk
+  split at hk
+  · exact h.lt k p hk
+  · split at hk
+    · rcases blockNode_parent _ _ _ _ _ _ _ p hk with ⟨_, h0⟩ | hlt
+      · cases h0
+      · omega
+    · cases hk
+
+theorem parentLt_attachTodo {m : Model} {w : World} {t : TodoR} (h : ParentLt w) (hs : 25 ≤ w.dom.size) :
+    ParentLt (attachTodo m w t) := by
+  unfold attachTodo; split
+  · exact parentLt_appendChild (parentLt_renderTodoW h) (by simp [nList]; omega)
+  · exact h
+
+theorem parentLt_loopW (m : Model) : ∀ (ts : List TodoR) (w : World), ParentLt w → 25 ≤ w.dom.size →
+    ParentLt (loopW m ts w)
+  | [], _, h, _ => h
+  | t :: ts, w, h, hs => parentLt_loopW m ts _ (parentLt_attachTodo h hs)
+      (Nat.le_trans hs (attachTodo_size_ge m w t))
+
+/-! ## `render()` -/
+
+def countChain : List Nat := [nCount, nFooter, 1, 0]
+
+theorem mem_countChain {x : Nat} (hx : x ∈ countChain) : x < 25 := by
+  have : x = 12 ∨ x = 11 ∨ x = 1 ∨ x = 0 := by simpa [countChain] using hx
+  omega
+
+theorem countChain_not_mem {x : Nat} (hx : 25 ≤ x) : countChain.contains x = false := by
+  cases h : countChain.contains x
+  · rfl
+  · have := mem_countChain (by simpa using h); omega
+
+/-- The world after `render()`, step by step as in the JS. (The values are
+written the way the JS computes them; `Rep.lean` relates them to the model.) -/
+def renderW (m : Model) (w : World) : World :=
+  let n : Int := m.activeCount
+  let len : Int := m.todos.length
+  let w := loopW m m.todos (w.replaceChildren nList)
+  let w := w.modify nMain fun nd => { nd with hidden := decide (len = 0) }
+  let w := w.modify nFooter fun nd => { nd with hidden := decide (len = 0) }
+  let w := w.modify nToggleAll fun nd => { nd with checked := decide (0 < len) && decide (n = 0) }
+  let w := w.replaceChildren nCount
+  let c := w.dom.size
+  let w := (w.alloc { tag := "strong" }).1.setTextContent c (toString n)
+  let w := w.appendChild nCount c
+  let w := (w.alloc { tag := "#text", text := if n = 1 then " item left" else " items left" }).1.appendChild
+    nCount (c + 2)
+  let w := w.modify nClear fun nd => { nd with hidden := decide (len - n = 0) }
+  let w := w.modify nFilterAll fun nd =>
+    { nd with className := if filterStr m.hash = "all" then "selected" else "" }
+  let w := w.modify nFilterActive fun nd =>
+    { nd with className := if filterStr m.hash = "active" then "selected" else "" }
+  w.modify nFilterCompleted fun nd =>
+    { nd with className := if filterStr m.hash = "completed" then "selected" else "" }
+
+/-- What `render` needs to know about the world before it runs. -/
+structure RenderPre (m : Model) (w : World) : Prop where
+  funcs : w.funcs = funcs
+  globals : w.globals = globalsOf m
+  size : 25 ≤ w.dom.size
+  listChain : Chain w nList listChain
+  lt : ParentLt w
+  listChildren : ∀ c ∈ (w.node nList).children, 25 ≤ c
+
+theorem assocGet_foldl_t (x : String) (hx : x ≠ "t") :
+    ∀ (ts : List TodoR) (ls : List (String × Value)),
+      assocGet (ts.foldl (fun ls t => assocSet ls "t" t.val) ls) x = assocGet ls x
+  | [], _ => rfl
+  | t :: ts, ls => by
+    rw [List.foldl_cons, assocGet_foldl_t x hx ts, assocGet_assocSet, if_neg (Ne.symm hx)]
+
+set_option maxHeartbeats 8000000 in
+theorem spec_render {m : Model} {l : Locals} {w : World} (h : RenderPre m w) :
+    R (callValue (.fn "render" []) []) l w = some (.ok ((.undef, l), renderW m w)) := by
+  rw [callFn lk_render h.funcs]
+  have hc1 : Chain (w.replaceChildren nList) nList listChain :=
+    h.listChain.replaceChildren fun x hx hc => by
+      have := mem_listChain hx; have := h.listChildren x hc; omega
+  have hloop := spec_loop m m.todos [] (w.replaceChildren nList) (by simp [h.funcs]) (by simp [h.globals])
+    hc1 (by simp [h.size]) (by intros; rfl)
+  unfold loopBody at hloop
+  have hW := loopW_same m m.todos (w.replaceChildren nList)
+  have hfW : (loopW m m.todos (w.replaceChildren nList)).funcs = funcs := by rw [hW.funcs]; simp [h.funcs]
+  have hgW : (loopW m m.todos (w.replaceChildren nList)).globals = globalsOf m := by
+    rw [hW.globals]; simp [h.globals]
+  have hfil := spec_filterArr (g := .fn "isActive" []) (p := fun t => !t.completed)
+    (w := loopW m m.todos (w.replaceChildren nList)) m.todos (fun t _ l => spec_isActive hfW t)
+  have hltW : ParentLt (loopW m m.todos (w.replaceChildren nList)) :=
+    parentLt_loopW m _ _ (parentLt_replaceChildren h.lt) (by simp [h.size])
+  have hsW : 25 ≤ (loopW m m.todos (w.replaceChildren nList)).dom.size :=
+    Nat.le_trans (by simp [h.size]) (loopW_size_ge m _ _)
+  have hlt12 : nCount < (loopW m m.todos (w.replaceChildren nList)).dom.size := by simp [nCount]; omega
+  by_cases hz : m.todos.length = 0
+  · have hz' : ((m.todos.length : Int) > 0) = False := by simp [hz]
+    js_simp [Fn.render, h.funcs, h.globals, globalsOf, TodoMVC.funcs, todosVal, hloop, hfW, hgW, hfil,
+      assocGet_foldl_t, List.length_map, hz', hz, World.ParentLt.not_mem_ancestors, hltW, hlt12,
+      parentLt_alloc, parentLt_modify_of, parentLt_modify_parent, parentLt_replaceChildren, Nat.lt_add_right, Option.some.injEq, forall_eq', implies_true,
+      forall_const, renderW, Model.activeCount]
+    all_goals rfl
+  · have hz' : ((m.todos.length : Int) > 0) = True := by simp; omega
+    js_simp [Fn.render, h.funcs, h.globals, globalsOf, TodoMVC.funcs, todosVal, hloop, hfW, hgW, hfil,
+      assocGet_foldl_t, List.length_map, hz', hz, World.ParentLt.not_mem_ancestors, hltW, hlt12,
+      parentLt_alloc, parentLt_modify_of, parentLt_modify_parent, parentLt_replaceChildren, Nat.lt_add_right, Option.some.injEq, forall_eq', implies_true,
+      forall_const, renderW, Model.activeCount]
+    all_goals rfl
+
 end TodoMVC.Proof

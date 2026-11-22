@@ -6,10 +6,10 @@ namespace World
 open DOM
 
 /-- Render the subtree at `n` as HTML-like text, omitting hidden subtrees. -/
-def pretty (w : World) (n : NodeId := 0) (indent : String := "") : String :=
+def pretty (w : World) (n : Nat := 0) (indent : String := "") : String :=
   go w.dom.size n indent
 where
-  go : Nat → NodeId → String → String
+  go : Nat → Nat → String → String
     | 0, _, _ => ""
     | f + 1, n, ind =>
       let nd := w.node n

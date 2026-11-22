@@ -50,16 +50,16 @@ structure Model.WF (m : Model) : Prop where
   lt : ∀ t ∈ m.todos, t.id < m.nextId
 
 /-- Node indices of the static elements the script refers to. -/
-abbrev nNewTodo : NodeId := 5
-abbrev nMain : NodeId := 6
-abbrev nToggleAll : NodeId := 7
-abbrev nList : NodeId := 10
-abbrev nFooter : NodeId := 11
-abbrev nCount : NodeId := 12
-abbrev nFilterAll : NodeId := 15
-abbrev nFilterActive : NodeId := 18
-abbrev nFilterCompleted : NodeId := 21
-abbrev nClear : NodeId := 23
+abbrev nNewTodo : Nat := 5
+abbrev nMain : Nat := 6
+abbrev nToggleAll : Nat := 7
+abbrev nList : Nat := 10
+abbrev nFooter : Nat := 11
+abbrev nCount : Nat := 12
+abbrev nFilterAll : Nat := 15
+abbrev nFilterActive : Nat := 18
+abbrev nFilterCompleted : Nat := 21
+abbrev nClear : Nat := 23
 
 def globalsOf (m : Model) : List (String × Value) :=
   [("todos", todosVal m.todos), ("nextId", .num m.nextId), ("editingId", .num m.editingId),
@@ -74,7 +74,7 @@ def selectedIf (b : Bool) : String := if b then "selected" else ""
 /-- The static nodes `0 … 24`. `v5`/`v7` are the (user-editable) values of the
 new-todo field and the toggle-all checkbox; `lis` and `cnt` are the children of
 the todo list and the counter. -/
-def staticNode (m : Model) (v5 v7 : String) (lis cnt : List NodeId) : NodeId → Node
+def staticNode (m : Model) (v5 v7 : String) (lis cnt : List Nat) : Nat → Node
   | 0 => { tag := "body", children := [1] }
   | 1 => { tag := "section", className := "todoapp", children := [2, 6, 11], parent := some 0 }
   | 2 => { tag := "header", className := "header", children := [3, 5], parent := some 1 }
@@ -131,7 +131,7 @@ def blockSize (t : TodoR) (ed : Bool) : Nat := dOff t + 1 + (if ed then 1 else 0
 
 /-- The block of nodes for `t` at `b`, attached to `parent`. `v2` and `ve` are the
 values of the checkbox and the edit field. -/
-def blockNode (b : NodeId) (t : TodoR) (ed : Bool) (parent : Option NodeId) (v2 ve : String) :
+def blockNode (b : Nat) (t : TodoR) (ed : Bool) (parent : Option Nat) (v2 ve : String) :
     Nat → Node
   | 0 => { tag := "li", className := liClass t ed,
            children := [b + 1] ++ (if ed then [b + dOff t + 1] else []), parent }
@@ -162,7 +162,7 @@ def renderTodoW (w : World) (t : TodoR) (ed : Bool) : World :=
   allocMany w (blockNode w.dom.size t ed none "" t.title) (blockSize t ed)
 
 /-- `w` contains the block for `t` at `b`, attached to `parent`. -/
-def Block (w : World) (b : NodeId) (t : TodoR) (ed : Bool) (parent : Option NodeId) : Prop :=
+def Block (w : World) (b : Nat) (t : TodoR) (ed : Bool) (parent : Option Nat) : Prop :=
   b + blockSize t ed ≤ w.dom.size ∧
   ∃ v2 ve, ∀ i < blockSize t ed, w.node (b + i) = blockNode b t ed parent v2 ve i
 
@@ -171,7 +171,7 @@ def Block (w : World) (b : NodeId) (t : TodoR) (ed : Bool) (parent : Option Node
 def countLabel (n : Nat) : String := if n = 1 then " item left" else " items left"
 
 /-- `w` contains the counter nodes at `c` (strong, its text, the label). -/
-def Counter (w : World) (c : NodeId) (n : Nat) : Prop :=
+def Counter (w : World) (c : Nat) (n : Nat) : Prop :=
   c + 3 ≤ w.dom.size ∧
   w.node c = { tag := "strong", children := [c + 1], parent := some nCount } ∧
   w.node (c + 1) = { tag := "#text", text := toString n, parent := some c } ∧
@@ -183,10 +183,6 @@ def Counter (w : World) (c : NodeId) (n : Nat) : Prop :=
 def ParentWF (w : World) : Prop :=
   ∀ k p, (w.node k).parent = some p → k ∈ (w.node p).children
 
-/-- A parent always has a smaller index than its children. -/
-def ParentLt (w : World) : Prop :=
-  ∀ k p, (w.node k).parent = some p → p < k
-
 /-- The document of `w` represents `m`. -/
 structure DomRep (m : Model) (w : World) : Prop where
   size : 25 ≤ w.dom.size
@@ -194,7 +190,7 @@ structure DomRep (m : Model) (w : World) : Prop where
     List.Forall₂ (fun b t => Block w b t (m.editingId = t.id) (some nList)) lis m.shown ∧
     Counter w c m.activeCount
   wf : ParentWF w
-  lt : ParentLt w
+  lt : World.ParentLt w
 
 def storageRep (m : Model) (st : List (String × String)) : Prop :=
   (st = [] ∧ m.todos = []) ∨ st = [(STORAGE_KEY, Json.stringify (todosVal m.todos))]

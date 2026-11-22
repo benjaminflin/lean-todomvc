@@ -46,7 +46,7 @@ def stored (s : State) : Option (List Todo) :=
     | some (.arr vs) => vs.mapM parseTodo
     | _ => none
 
-def q (s : State) (sel : String) : Option NodeId := s.world.querySelector sel
+def q (s : State) (sel : String) : Option Nat := s.world.querySelector sel
 
 def isVisible (s : State) (sel : String) : Bool :=
   match q s sel with
@@ -59,16 +59,16 @@ def text (s : State) (sel : String) : String :=
   | none => ""
 
 /-- The `<li>`s of the todo list. -/
-def items (s : State) : List NodeId :=
+def items (s : State) : List Nat :=
   match q s ".todo-list" with
   | some n => (s.world.node n).children
   | none => []
 
 /-- The first node in the subtree of `n` with the given class or tag. -/
-def find (s : State) (n : NodeId) (p : Node → Bool) : Option NodeId :=
+def find (s : State) (n : Nat) (p : Node → Bool) : Option Nat :=
   (s.world.subtree n).find? fun m => p (s.world.node m)
 
-def itemTodo (s : State) (li : NodeId) : Todo :=
+def itemTodo (s : State) (li : Nat) : Todo :=
   ⟨match find s li (·.tag == "label") with
     | some l => s.world.textContent l
     | none => "",
@@ -159,7 +159,7 @@ def invariant (s : State) : Bool :=
 
 /-! ## Actions the specification talks about -/
 
-def on (sel : String) (mk : NodeId → Action) : State → Action → Prop :=
+def on (sel : String) (mk : Nat → Action) : State → Action → Prop :=
   fun s a => ∃ n, q s sel = some n ∧ a = mk n
 
 def enterNewTodo := on ".new-todo" (.keydown · "Enter")
@@ -218,7 +218,7 @@ def specCanComplete : Φ :=
 def run (s : State) (as : List (State → Action)) : State :=
   as.foldl (fun s a => app.step s (a s)) s
 
-def node (s : State) (sel : String) : NodeId := (q s sel).getD 0
+def node (s : State) (sel : String) : Nat := (q s sel).getD 0
 
 theorem run_reachable (as : List (State → Action)) :
     ∀ s, Reachable app.step s (run s as) := by
@@ -267,7 +267,7 @@ def actions (s : State) : List Action :=
 def add (title : String) : List (State → Action) :=
   [fun s => .input (node s ".new-todo") title, fun s => .keydown (node s ".new-todo") "Enter"]
 
-def firstLabel (s : State) : NodeId := (find s (node s ".todo-list") (·.tag == "label")).getD 0
+def firstLabel (s : State) : Nat := (find s (node s ".todo-list") (·.tag == "label")).getD 0
 
 /-- Reachable seed states: empty; two todos with one completed; the same
 filtered to active; and while editing. -/

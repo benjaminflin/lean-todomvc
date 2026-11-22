@@ -194,35 +194,35 @@ theorem R_callValue_fn {name : String} {bound args : List Value} {l : Locals} {w
 @[simp] theorem R_getMember_arr_length (vs : List Value) (l : Locals) (w : World) :
     R (getMember (.arr vs) "length") l w = some (.ok ((.num vs.length, l), w)) := rfl
 
-@[simp] theorem R_getMember_node_value (n : NodeId) (l : Locals) (w : World) :
+@[simp] theorem R_getMember_node_value (n : Nat) (l : Locals) (w : World) :
     R (getMember (.node n) "value") l w = some (.ok ((.str (w.node n).value, l), w)) := rfl
 
-@[simp] theorem R_getMember_node_checked (n : NodeId) (l : Locals) (w : World) :
+@[simp] theorem R_getMember_node_checked (n : Nat) (l : Locals) (w : World) :
     R (getMember (.node n) "checked") l w = some (.ok ((.bool (w.node n).checked, l), w)) := rfl
 
 @[simp] theorem R_getMember_location_hash (l : Locals) (w : World) :
     R (getMember (.host .location) "hash") l w = some (.ok ((.str w.hash, l), w)) := rfl
 
-@[simp] theorem R_setMember_value (n : NodeId) (v : Value) (l : Locals) (w : World) :
+@[simp] theorem R_setMember_value (n : Nat) (v : Value) (l : Locals) (w : World) :
     R (setMember (.node n) "value" v) l w =
       some (.ok (((), l), w.modify n fun nd => { nd with value := toStr v })) := rfl
 
-@[simp] theorem R_setMember_checked (n : NodeId) (v : Value) (l : Locals) (w : World) :
+@[simp] theorem R_setMember_checked (n : Nat) (v : Value) (l : Locals) (w : World) :
     R (setMember (.node n) "checked" v) l w =
       some (.ok (((), l), w.modify n fun nd => { nd with checked := truthy v })) := rfl
 
-@[simp] theorem R_setMember_hidden (n : NodeId) (v : Value) (l : Locals) (w : World) :
+@[simp] theorem R_setMember_hidden (n : Nat) (v : Value) (l : Locals) (w : World) :
     R (setMember (.node n) "hidden" v) l w =
       some (.ok (((), l), w.modify n fun nd => { nd with hidden := truthy v })) := rfl
 
-@[simp] theorem R_setMember_className (n : NodeId) (v : Value) (l : Locals) (w : World) :
+@[simp] theorem R_setMember_className (n : Nat) (v : Value) (l : Locals) (w : World) :
     R (setMember (.node n) "className" v) l w =
       some (.ok (((), l), w.modify n fun nd => { nd with className := toStr v })) := rfl
 
-@[simp] theorem R_setMember_textContent (n : NodeId) (v : Value) (l : Locals) (w : World) :
+@[simp] theorem R_setMember_textContent (n : Nat) (v : Value) (l : Locals) (w : World) :
     R (setMember (.node n) "textContent" v) l w = some (.ok (((), l), w.setTextContent n (toStr v))) := rfl
 
-@[simp] theorem R_setMember_type (n : NodeId) (v : Value) (l : Locals) (w : World) :
+@[simp] theorem R_setMember_type (n : Nat) (v : Value) (l : Locals) (w : World) :
     R (setMember (.node n) "type" v) l w =
       some (.ok (((), l), w.modify n fun nd => { nd with attrs := assocSet nd.attrs "type" (toStr v) })) := rfl
 
@@ -249,7 +249,7 @@ theorem R_callMethod_host (h : Host) (m : String) (args : List Value) (l : Local
       | none => some (.error ("TypeError: " ++ (toStr (.host h) ++ "." ++ m ++ " is not a function"))) :=
   R_callMethod_builtin (by simp)
 
-theorem R_callMethod_node (n : NodeId) (m : String) (args : List Value) (l : Locals) (w : World) :
+theorem R_callMethod_node (n : Nat) (m : String) (args : List Value) (l : Locals) (w : World) :
     R (callMethod (.node n) m args) l w = (R (builtinMethod (.node n) m args) l w).andThen fun o l w =>
       match o with
       | some v => some (.ok ((v, l), w))
@@ -311,13 +311,13 @@ theorem R_builtin_parse (s : String) (args : List Value) (l : Locals) (w : World
     R (builtinMethod (.host .window) "addEventListener" (.str t :: f :: args)) l w =
       some (.ok ((some .undef, l), { w with windowListeners := w.windowListeners ++ [(t, f)] })) := rfl
 
-@[simp] theorem R_builtin_addEventListener (n : NodeId) (t : String) (f : Value) (args : List Value)
+@[simp] theorem R_builtin_addEventListener (n : Nat) (t : String) (f : Value) (args : List Value)
     (l : Locals) (w : World) :
     R (builtinMethod (.node n) "addEventListener" (.str t :: f :: args)) l w =
       some (.ok ((some .undef, l),
         w.modify n fun nd => { nd with listeners := nd.listeners ++ [(t, f)] })) := rfl
 
-theorem R_builtin_appendChild (p c : NodeId) (args : List Value) (l : Locals) (w : World) :
+theorem R_builtin_appendChild (p c : Nat) (args : List Value) (l : Locals) (w : World) :
     R (builtinMethod (.node p) "appendChild" (.node c :: args)) l w =
       if (w.ancestors p).contains c then some (.error "HierarchyRequestError")
       else some (.ok ((some (.node c), l), w.appendChild p c)) := by
@@ -325,11 +325,11 @@ theorem R_builtin_appendChild (p c : NodeId) (args : List Value) (l : Locals) (w
   simp only [R_bind, R_getThe, Res.andThen_ok]
   split <;> simp_all
 
-@[simp] theorem R_builtin_replaceChildren (p : NodeId) (l : Locals) (w : World) :
+@[simp] theorem R_builtin_replaceChildren (p : Nat) (l : Locals) (w : World) :
     R (builtinMethod (.node p) "replaceChildren" []) l w =
       some (.ok ((some .undef, l), w.replaceChildren p)) := rfl
 
-@[simp] theorem R_builtin_focus (p : NodeId) (args : List Value) (l : Locals) (w : World) :
+@[simp] theorem R_builtin_focus (p : Nat) (args : List Value) (l : Locals) (w : World) :
     R (builtinMethod (.node p) "focus" args) l w = some (.ok ((some .undef, l), w)) := rfl
 
 @[simp] theorem R_builtin_bind (f : String) (bound args : List Value) (l : Locals) (w : World) :
@@ -370,6 +370,24 @@ theorem nat_eq_self_add (a b : Nat) : (a = a + b) ↔ b = 0 := by omega
 theorem nat_self_add_eq (a b : Nat) : (a + b = a) ↔ b = 0 := by omega
 theorem nat_lt_self_add (a b : Nat) : (a < a + b) ↔ 0 < b := by omega
 
+theorem toString_natCast_eq_empty (n : Nat) : (toString (n : Int) = "") = False := by
+  have : toString (n : Int) = toString n := rfl
+  rw [this]
+  simp only [eq_iff_iff, iff_false]
+  exact Nat.repr_ne_empty
+
+theorem R_ite_pure {α} (c : Prop) [Decidable c] (a b : α) (l : Locals) (w : World) :
+    R (if c then (pure a : M α) else pure b) l w = some (.ok (((if c then a else b), l), w)) := by
+  split <;> rfl
+
+theorem ite_value_str (c : Prop) [Decidable c] (a b : String) :
+    (if c then Value.str a else Value.str b) = Value.str (if c then a else b) := by
+  split <;> rfl
+
+theorem ite_value_bool (c : Prop) [Decidable c] (a b : Bool) :
+    (if c then Value.bool a else Value.bool b) = Value.bool (if c then a else b) := by
+  split <;> rfl
+
 /-- Symbolic execution: step through interpreter code with the lemmas above. -/
 syntax "js_simp" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic
 
@@ -378,7 +396,7 @@ macro_rules
     let extra := (extra.map (·.getElems)).getD #[]
     `(tactic| simp (config := { maxSteps := 10000000, maxDischargeDepth := 12 }) only [
       evalE, evalList, evalFields, execS, execB, execFor,
-      R_pure, R_bind, R_map, R_seqRight, R_throw, R_get, R_set, R_getThe, R_setWorld, R_modifyThe,
+      R_pure, R_bind, R_map, R_ite_pure, ite_value_str, ite_value_bool, R_seqRight, R_throw, R_get, R_set, R_getThe, R_setWorld, R_modifyThe,
       Res.andThen_ok, Res.andThen_error,
       R_lookupVar,
       R_declVar_local, R_assignVar,
@@ -410,10 +428,12 @@ macro_rules
       Option.map_some, Option.map_none, Option.getD_some, Option.getD_none, Option.isSome_some,
       Option.isSome_none, Function.comp_apply,
       ite_true, ite_false, decide_true, decide_false, Bool.not_true, Bool.not_false,
-      beq_self_eq_true, ne_eq, not_false_eq_true, not_true_eq_false, decide_not, List.foldl_cons, List.foldl_nil, reduceCtorEq, Nat.add_one_ne_zero,
+      beq_self_eq_true, ne_eq, not_false_eq_true, implies_true, false_implies, forall_const,
+      forall_eq', Option.some.injEq, eq_self_iff_true, decide_eq_true_eq, not_true_eq_false, decide_not, List.foldl_cons, List.foldl_nil, reduceCtorEq, Nat.add_one_ne_zero,
       true_and, and_true, false_and, and_false, Bool.true_and, Bool.false_and, Bool.and_true,
       Bool.or_false, Bool.false_or, Bool.true_or, Bool.or_true,
-      List.any_cons, List.any_nil, String.reduceBEq, String.reduceEq, String.reduceAppend, reduceIte, Nat.reduceEqDiff, Int.reduceEq, Int.reduceNeg,
+      List.any_cons, List.any_nil, String.reduceBEq, String.reduceEq, String.reduceAppend, reduceIte, Nat.reduceEqDiff, Int.reduceEq, Int.reduceNeg, Int.reduceGT, Int.reduceLT, Int.reduceSub, Int.reduceAdd,
+      toString_natCast_eq_empty, Int.natCast_zero, Int.natCast_eq_zero, Int.natCast_pos, gt_iff_lt, Int.lt_irrefl,
       Nat.add_assoc, Nat.reduceAdd, Nat.add_lt_add_iff_left, Nat.reduceLT, Nat.lt_add_one,
       Nat.add_left_cancel_iff, nat_eq_self_add, nat_self_add_eq, nat_lt_self_add, Nat.one_ne_zero,
       Nat.succ_ne_zero, Nat.lt_irrefl, Nat.zero_lt_succ, Nat.zero_lt_one, beq_iff_eq,

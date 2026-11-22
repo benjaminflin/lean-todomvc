@@ -30,13 +30,13 @@ structure State where
   errors : List String := []
 
 inductive Action where
-  | click (n : NodeId)
-  | dblclick (n : NodeId)
+  | click (n : Nat)
+  | dblclick (n : Nat)
   /-- the user edits the text of an input field to `v` -/
-  | input (n : NodeId) (v : String)
+  | input (n : Nat) (v : String)
   /-- a key press in a focused element; we do not model focus otherwise -/
-  | keydown (n : NodeId) (key : String)
-  | blur (n : NodeId)
+  | keydown (n : Nat) (key : String)
+  | blur (n : Nat)
   /-- the user edits the URL fragment -/
   | navigate (hash : String)
   | reload
@@ -51,12 +51,12 @@ def run (s : State) (m : M Unit) : State :=
   | some (.error e) => { s with errors := e :: s.errors }
   | none => { s with errors := "diverged" :: s.errors }
 
-def eventObj (type : String) (target : NodeId) (key : String := "") : Value :=
+def eventObj (type : String) (target : Nat) (key : String := "") : Value :=
   .obj [("type", .str type), ("key", .str key), ("target", .node target)]
 
 /-- Call the listeners for `type` registered on `n`. Each listener runs as a
 separate task, so one failing does not prevent the others from running. -/
-def fire (s : State) (n : NodeId) (type : String) (key : String := "") : State :=
+def fire (s : State) (n : Nat) (type : String) (key : String := "") : State :=
   let ls := ((s.world.node n).listeners.filter (·.1 == type)).map (·.2)
   ls.foldl (fun s l => s.run (fireListeners [l] (eventObj type n key))) s
 
@@ -68,7 +68,7 @@ def setHash (s : State) (h : String) : State :=
 
 /-- A click on `n`, including the browser's default actions: toggling a
 checkbox, and following a `#fragment` link. -/
-def click (s : State) (n : NodeId) : State :=
+def click (s : State) (n : Nat) : State :=
   let nd := s.world.node n
   let s := if nd.tag == "input" && nd.attr "type" == some "checkbox" then
       { s with world := s.world.modify n fun nd => { nd with checked := !nd.checked } }

@@ -15,8 +15,6 @@ something.
 namespace DOM
 open JS
 
-abbrev NodeId := Nat
-
 structure Node where
   tag : String
   /-- the `id` attribute -/
@@ -29,8 +27,8 @@ structure Node where
   value : String := ""
   checked : Bool := false
   hidden : Bool := false
-  children : List NodeId := []
-  parent : Option NodeId := none
+  children : List Nat := []
+  parent : Option Nat := none
   /-- event listeners, in registration order: event type and function value -/
   listeners : List (String × Value) := []
   deriving Repr, Inhabited
@@ -76,74 +74,74 @@ structure World where
 namespace World
 open DOM
 
-def node? (w : World) (n : NodeId) : Option Node := w.dom[n]?
+def node? (w : World) (n : Nat) : Option Node := w.dom[n]?
 
-def node (w : World) (n : NodeId) : Node := w.dom[n]?.getD default
+def node (w : World) (n : Nat) : Node := w.dom[n]?.getD default
 
-def modify (w : World) (n : NodeId) (f : Node → Node) : World :=
+def modify (w : World) (n : Nat) (f : Node → Node) : World :=
   { w with dom := w.dom.modify n f }
 
-def alloc (w : World) (nd : Node) : World × NodeId :=
+def alloc (w : World) (nd : Node) : World × Nat :=
   ({ w with dom := w.dom.push nd }, w.dom.size)
 
 /-- The ancestors of `n` (including `n`), following parent pointers. -/
-def ancestors (w : World) (n : NodeId) : List NodeId :=
+def ancestors (w : World) (n : Nat) : List Nat :=
   go w.dom.size n
 where
-  go : Nat → NodeId → List NodeId
+  go : Nat → Nat → List Nat
     | 0, _ => []
     | f + 1, n => n :: match (w.node n).parent with
       | some p => go f p
       | none => []
 
 /-- `n` is in the document (connected to the root, node `0`). -/
-def attached (w : World) (n : NodeId) : Bool :=
+def attached (w : World) (n : Nat) : Bool :=
   n < w.dom.size && (w.ancestors n).getLast? == some 0
 
 /-- `n` is in the document and neither it nor any ancestor is `hidden`. -/
-def visible (w : World) (n : NodeId) : Bool :=
+def visible (w : World) (n : Nat) : Bool :=
   w.attached n && (w.ancestors n).all fun a => !(w.node a).hidden
 
 /-- Detach `c` from its parent, if any. -/
-def detach (w : World) (c : NodeId) : World :=
+def detach (w : World) (c : Nat) : World :=
   match (w.node c).parent with
   | none => w
   | some p =>
     let w := w.modify p fun nd => { nd with children := nd.children.filter (· != c) }
     w.modify c fun nd => { nd with parent := none }
 
-def appendChild (w : World) (p c : NodeId) : World :=
+def appendChild (w : World) (p c : Nat) : World :=
   let w := w.detach c
   let w := w.modify p fun nd => { nd with children := nd.children ++ [c] }
   w.modify c fun nd => { nd with parent := some p }
 
-def replaceChildren (w : World) (p : NodeId) : World :=
+def replaceChildren (w : World) (p : Nat) : World :=
   let cs := (w.node p).children
   let w := cs.foldl (fun w c => w.modify c fun nd => { nd with parent := none }) w
   w.modify p fun nd => { nd with children := [] }
 
 /-- Nodes of the subtree rooted at `n`, in document (pre-)order. -/
-def subtree (w : World) (n : NodeId) : List NodeId :=
+def subtree (w : World) (n : Nat) : List Nat :=
   go w.dom.size n
 where
-  go : Nat → NodeId → List NodeId
+  go : Nat → Nat → List Nat
     | 0, _ => []
     | f + 1, n => n :: ((w.node n).children.flatMap (go f))
 
 /-- All nodes in the document, in document order. -/
-def documentNodes (w : World) : List NodeId := w.subtree 0
+def documentNodes (w : World) : List Nat := w.subtree 0
 
-def textContent (w : World) (n : NodeId) : String :=
+def textContent (w : World) (n : Nat) : String :=
   String.join ((w.subtree n).map fun m => (w.node m).text)
 
-def setTextContent (w : World) (n : NodeId) (s : String) : World :=
+def setTextContent (w : World) (n : Nat) (s : String) : World :=
   let w := w.replaceChildren n
   if s == "" then w else
   let (w, t) := w.alloc { tag := "#text", text := s }
   w.appendChild n t
 
 /-- `document.querySelector` for the simple selectors `#id`, `.class` and `tag`. -/
-def querySelector (w : World) (sel : String) : Option NodeId :=
+def querySelector (w : World) (sel : String) : Option Nat :=
   match sel.toList with
   | '#' :: id => w.documentNodes.find? fun n => (w.node n).id == String.ofList id
   | '.' :: c => w.documentNodes.find? fun n => (w.node n).hasClass (String.ofList c)
@@ -155,7 +153,7 @@ def ofHtml (body : List Html) : World :=
   let w : World := { dom := #[{ tag := "body" }] }
   body.foldl (fun w h => (load w 0 h)) w
 where
-  load (w : World) (p : NodeId) : Html → World
+  load (w : World) (p : Nat) : Html → World
     | .text s =>
       let (w, t) := w.alloc { tag := "#text", text := s }
       w.appendChild p t
@@ -168,7 +166,7 @@ where
       let (w, n) := w.alloc nd
       let w := w.appendChild p n
       loadList w n cs
-  loadList (w : World) (p : NodeId) : List Html → World
+  loadList (w : World) (p : Nat) : List Html → World
     | [] => w
     | h :: hs => loadList (load w p h) p hs
 
